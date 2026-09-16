@@ -1,0 +1,43 @@
+# /etc/systemd/system/urlscan-dashboard.service
+[Unit]
+Description=urlscan.io contact sheet dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+User=urlscan
+Group=urlscan
+WorkingDirectory=/opt/urlscan-dashboard
+
+# Keep secrets out of the unit file. Mode 0600, owned by root:urlscan.
+EnvironmentFile=/etc/urlscan-dashboard.env
+
+# ProtectSystem=strict makes /opt read-only, so do not try to write .pyc files.
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONUNBUFFERED=1
+
+ExecStart=/opt/urlscan-dashboard/venv/bin/gunicorn -c gunicorn.conf.py wsgi:application
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=on-failure
+RestartSec=5
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+ReadWritePaths=
+
+[Install]
+WantedBy=multi-user.target
