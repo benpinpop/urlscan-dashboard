@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<title>Contact sheet — urlscan.io search</title>
+<title>Query Visualizer</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 <link rel="icon" href="data:,">
 </head>
@@ -12,9 +12,8 @@
 
 <header class="sheet-head">
   <div class="sheet-head__title">
-    <h1>URLScan Screenshot Viewer</h1>
-    <p>Search the urlscan.io archive and read every hit as a frame: screenshot, the address it actually
-       contacted, and how its certificate looked at scan time.</p>
+    <h1>Query Visualizer</h1>
+    <p>Visualize and analyze your search queries. Powered by URLScan.io</p>
   </div>
 
   <div class="key" id="key-panel">
@@ -94,6 +93,12 @@
       </span>
     </label>
 
+    <div class="knob knob--details">
+      <span class="knob__label">Card details</span>
+      <button type="button" id="toggle-details" class="btn btn--ghost btn--small"
+              aria-pressed="false">Hide details</button>
+    </div>
+
     <button type="button" id="run" class="btn btn--primary">Search</button>
   </div>
 </section>
@@ -115,13 +120,8 @@
 
 <main>
   <section class="empty" id="empty">
-    <h2>Start with a query</h2>
-    <ul class="empty__examples">
-      <li><button type="button" class="example" data-q="page.domain:example.com">page.domain:example.com</button></li>
-      <li><button type="button" class="example" data-q="page.asnname:cloudflare AND page.status:200">page.asnname:cloudflare AND page.status:200</button></li>
-      <li><button type="button" class="example" data-q="task.tags:phishing">task.tags:phishing</button></li>
-      <li><button type="button" class="example" data-q="page.ip:&quot;1.1.1.1&quot;">page.ip:"1.1.1.1"</button></li>
-    </ul>
+    <h2>Pivots</h2>
+    <ul class="empty__examples" id="example-list"></ul>
   </section>
 
   <section class="sheet cols-6" id="sheet" aria-label="Search results"></section>
@@ -164,6 +164,7 @@
   </article>
 </template>
 
+<script src="{{ url_for('static', filename='js/examples.js') }}"></script>
 <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
 </body>
 </html>

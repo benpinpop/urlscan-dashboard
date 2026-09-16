@@ -212,6 +212,7 @@ code {
 .knob { flex: 0 1 190px; min-width: 130px; }
 .knob--density { flex: 0 0 auto; }
 .knob--collapse { flex: 0 1 auto; min-width: 190px; }
+.knob--details { flex: 0 0 auto; }
 
 .toggle {
   display: flex;
@@ -549,6 +550,13 @@ code {
 .cols-10 .fact dd { font-size: 11.5px; }
 .cols-10 .frame__margin { padding: 7px; }
 .cols-10 .fact--time { display: none; }
+
+.sheet.is-minimal .facts { display: none; }
+
+.sheet.is-minimal .frame__margin {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
 
 /* --- Pagination --------------------------------------------------------- */
 

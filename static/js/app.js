@@ -20,6 +20,7 @@
     sort: document.getElementById("sort"),
     filter: document.getElementById("filter"),
     collapseDomain: document.getElementById("collapse-domain"),
+    toggleDetails: document.getElementById("toggle-details"),
     run: document.getElementById("run"),
     quota: document.getElementById("quota"),
     sheet: document.getElementById("sheet"),
@@ -37,7 +38,8 @@
     lightboxTitle: document.getElementById("lightbox-title"),
     lightboxFacts: document.getElementById("lightbox-facts"),
     lightboxClose: document.getElementById("lightbox-close"),
-    tpl: document.getElementById("frame-tpl")
+    tpl: document.getElementById("frame-tpl"),
+    exampleList: document.getElementById("example-list")
   };
 
   var state = {
@@ -83,6 +85,20 @@
     return d.toLocaleString(undefined, {
       year: "numeric", month: "short", day: "2-digit",
       hour: "2-digit", minute: "2-digit"
+    });
+  }
+
+  function renderExamples() {
+    var examples = Array.isArray(window.URLSCAN_EXAMPLES) ? window.URLSCAN_EXAMPLES : [];
+    examples.forEach(function (query) {
+      var item = document.createElement("li");
+      var button = document.createElement("button");
+      button.type = "button";
+      button.className = "example";
+      button.dataset.q = query;
+      button.textContent = query;
+      item.appendChild(button);
+      el.exampleList.appendChild(item);
     });
   }
 
@@ -509,6 +525,11 @@
   el.sort.addEventListener("change", render);
   el.filter.addEventListener("input", applyFilter);
   el.collapseDomain.addEventListener("change", render);
+  el.toggleDetails.addEventListener("click", function () {
+    var minimal = el.sheet.classList.toggle("is-minimal");
+    el.toggleDetails.textContent = minimal ? "Show details" : "Hide details";
+    el.toggleDetails.setAttribute("aria-pressed", String(minimal));
+  });
 
   el.query.addEventListener("keydown", function (event) {
     if (event.key === "Enter") { event.preventDefault(); runSearch(false); }
@@ -535,7 +556,8 @@
   Array.prototype.forEach.call(document.querySelectorAll(".density__btn"), function (button) {
     button.addEventListener("click", function () {
       var cols = button.dataset.cols;
-      el.sheet.className = "sheet cols-" + cols;
+      el.sheet.classList.remove("cols-4", "cols-6", "cols-10");
+      el.sheet.classList.add("cols-" + cols);
       document.querySelectorAll(".density__btn").forEach(function (b) {
         b.classList.toggle("is-on", b === button);
         b.setAttribute("aria-pressed", String(b === button));
@@ -543,6 +565,7 @@
     });
   });
 
+  renderExamples();
   document.querySelectorAll(".example").forEach(function (button) {
     button.addEventListener("click", function () {
       el.query.value = button.dataset.q;
