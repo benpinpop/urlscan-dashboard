@@ -9,11 +9,12 @@ to disk or to a log line.
 from __future__ import annotations
 
 import logging
-import os
+import pathlib
 import re
 import sys
 
-from flask import Flask, g, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request
+from werkzeug.exceptions import HTTPException
 
 try:  # optional convenience, not required in production
     from dotenv import load_dotenv
@@ -173,14 +174,60 @@ def security_headers(response):
 # --------------------------------------------------------------------------
 
 
+REQUIRED_ASSETS = ("templates/index.html", "static/css/styles.css", "static/js/app.js")
+
+
+def missing_assets() -> list[str]:
+    """Which frontend files are not where Flask will look for them."""
+    root = pathlib.Path(app.root_path)
+    return [rel for rel in REQUIRED_ASSETS if not (root / rel).is_file()]
+
+
+def layout_help_page(missing: list[str]) -> str:
+    items = "".join(f"<li><code>{name}</code></li>" for name in missing)
+    return f"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Frontend files are missing</title></head>
+<body style="font:15px/1.6 system-ui,sans-serif;max-width:60ch;margin:48px auto;padding:0 16px">
+<h1>Frontend files are missing</h1>
+<p>The backend is running, but Flask cannot find these files under
+<code>{app.root_path}</code>:</p>
+<ul>{items}</ul>
+<p>Flask resolves templates and static files by directory, so the layout has to be
+exactly this:</p>
+<pre style="background:#f4f4f4;padding:12px;overflow:auto">app.py
+templates/index.html
+static/css/styles.css
+static/js/app.js</pre>
+<p>If the files were downloaded individually they are probably sitting flat next to
+<code>app.py</code>. Put them back:</p>
+<pre style="background:#f4f4f4;padding:12px;overflow:auto">mkdir -p templates static/css static/js
+mv index.html  templates/
+mv styles.css  static/css/
+mv app.js      static/js/</pre>
+<p><code>app.js</code> and <code>app.py</code> are different files — do not overwrite one with
+the other. Then restart the service.</p>
+</body></html>"""
+
+
 @app.route("/")
 def index():
+    missing = missing_assets()
+    if missing:
+        log.error("frontend files missing under %s: %s", app.root_path, ", ".join(missing))
+        return layout_help_page(missing), 500
+
     return render_template(
         "index.html",
         sizes=Config.ALLOWED_SIZES,
         server_key_configured=bool(Config.URLSCAN_API_KEY),
         force_server_key=Config.FORCE_SERVER_KEY,
     )
+
+
+@app.route("/favicon.ico")
+def favicon():
+    return "", 204
 
 
 @app.route("/api/health")
@@ -296,19 +343,37 @@ def quotas():
     return jsonify({"ok": True, "search": search_quota, "limits": limits or {}})
 
 
-@app.errorhandler(404)
-def not_found(_):
+@app.errorhandler(HTTPException)
+def http_error(exc: HTTPException):
+    """Render HTTP errors without touching a template.
+
+    The 404 page used to render index.html, so a missing template turned every
+    404 into a 500 and buried the real cause in a second traceback.
+    """
     if request.path.startswith("/api/"):
-        return fail("No such endpoint.", 404, "not_found")
-    return render_template("index.html", sizes=Config.ALLOWED_SIZES,
-                           server_key_configured=bool(Config.URLSCAN_API_KEY),
-                           force_server_key=Config.FORCE_SERVER_KEY), 404
+        return fail(exc.description or exc.name, exc.code or 500, "http_error")
+
+    body = (
+        f"<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\">"
+        f"<title>{exc.code} {exc.name}</title></head>"
+        f"<body style=\"font:15px/1.6 system-ui,sans-serif;max-width:52ch;"
+        f"margin:48px auto;padding:0 16px\">"
+        f"<h1>{exc.code} {exc.name}</h1>"
+        f"<p>Nothing is served at <code>{request.path}</code>. "
+        f"<a href=\"/\">Go to the dashboard</a>.</p></body></html>"
+    )
+    return body, exc.code or 500
 
 
 @app.errorhandler(Exception)
 def unhandled(exc):
+    # HTTPException has its own handler above; let it through untouched.
+    if isinstance(exc, HTTPException):
+        return exc
     log.exception("unhandled error: %s", type(exc).__name__)
-    return fail("Something broke on this server. Check the service logs.", 500, "internal_error")
+    if request.path.startswith("/api/"):
+        return fail("Something broke on this server. Check the service logs.", 500, "internal_error")
+    return "Internal server error. Check the service logs.", 500
 
 
 if __name__ == "__main__":
