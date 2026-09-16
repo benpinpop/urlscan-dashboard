@@ -4,125 +4,140 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="dark">
 <title>Contact sheet — urlscan.io search</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 <link rel="icon" href="data:,">
 </head>
 <body>
 
-<header class="sheet-head">
-  <div class="sheet-head__title">
-    <h1>Contact sheet</h1>
-    <p>Search the urlscan.io archive and read every hit as a frame: screenshot, the address it actually
-       contacted, and how its certificate looked at scan time.</p>
-  </div>
-
-  <div class="key" id="key-panel">
-    <label class="key__label" for="api-key">urlscan.io API key</label>
-    <div class="key__row">
-      <input type="password" id="api-key" class="key__input" autocomplete="off" spellcheck="false"
-             placeholder="Paste your key from urlscan.io/user/profile">
-      <button type="button" id="key-reveal" class="btn btn--ghost" aria-pressed="false">Show</button>
-      <button type="button" id="key-forget" class="btn btn--ghost">Forget</button>
+<header class="topbar">
+  <div class="shell topbar__inner">
+    <div class="brand">
+      <h1>Contact sheet</h1>
+      <p>urlscan.io archive search</p>
     </div>
-    <label class="key__remember">
-      <input type="checkbox" id="key-remember">
-      <span>Keep this key in this browser</span>
-    </label>
-    <p class="key__note" id="key-note">
-      Stored keys sit in localStorage, readable by any script that runs on this page and by anyone with
-      access to this profile. On a shared or untrusted machine, leave this off and paste the key each session.
-      The key is sent to this server, forwarded to urlscan.io as a request header, and never written to a log.
-    </p>
+
+    <div class="key" id="key-panel">
+      <label class="key__label" for="api-key">API key</label>
+      <div class="key__field">
+        <input type="password" id="api-key" class="key__input" autocomplete="off" spellcheck="false"
+               placeholder="Paste your urlscan.io key">
+        <button type="button" id="key-reveal" class="btn btn--ghost btn--small" aria-pressed="false">Show</button>
+        <button type="button" id="key-forget" class="btn btn--ghost btn--small">Forget</button>
+      </div>
+      <label class="key__remember">
+        <input type="checkbox" id="key-remember">
+        <span>Keep in this browser</span>
+      </label>
+      <p class="key__note" id="key-note" hidden>
+        Stored in localStorage: readable by any script on this page and by anyone with access to this
+        browser profile. On a shared machine, leave this off. The key is sent to this server, forwarded
+        to urlscan.io as a request header, and never written to a log.
+      </p>
+    </div>
   </div>
 </header>
 
 <section class="console" aria-label="Search controls">
-  <div class="console__query">
-    <label for="query">Query</label>
-    <input type="search" id="query" class="field field--query" spellcheck="false"
-           placeholder="page.domain:example.com" value="">
-    <p class="hint">
-      Elasticsearch query syntax. Combine fields with AND / OR, for example
-      <code>page.domain:example.com AND page.status:200</code>.
-    </p>
-  </div>
-
-  <div class="console__knobs">
-    <div class="knob">
-      <label for="size">Results per page</label>
-      <select id="size" class="field">
-        {% for s in sizes %}
-        <option value="{{ s }}"{% if s == 100 %} selected{% endif %}>{{ '{:,}'.format(s) }}</option>
-        {% endfor %}
-      </select>
+  <div class="shell console__inner">
+    <div class="searchrow">
+      <input type="search" id="query" class="field field--query" spellcheck="false"
+             placeholder="page.domain:example.com">
+      <button type="button" id="run" class="btn btn--primary">Search</button>
     </div>
 
-    <div class="knob">
-      <label for="sort">Order</label>
-      <select id="sort" class="field">
-        <option value="time:desc" selected>Newest scan first</option>
-        <option value="time:asc">Oldest scan first</option>
-        <option value="domain:asc">Domain A–Z</option>
-        <option value="domain:desc">Domain Z–A</option>
-        <option value="ip:asc">IP address</option>
-        <option value="country:asc">Country</option>
-        <option value="status:asc">HTTP status</option>
-        <option value="tls:asc">Certificate days left</option>
-      </select>
-    </div>
+    <div class="knobs">
+      <div class="knob">
+        <label for="size">Per page</label>
+        <select id="size" class="field">
+          {% for s in sizes %}
+          <option value="{{ s }}"{% if s == 100 %} selected{% endif %}>{{ '{:,}'.format(s) }}</option>
+          {% endfor %}
+        </select>
+      </div>
 
-    <div class="knob">
-      <label for="filter">Filter these results</label>
-      <input type="search" id="filter" class="field" spellcheck="false" placeholder="domain, IP, ASN…">
-    </div>
+      <div class="knob">
+        <label for="sort">Order</label>
+        <select id="sort" class="field">
+          <option value="time:desc" selected>Newest scan</option>
+          <option value="time:asc">Oldest scan</option>
+          <option value="domain:asc">Domain A–Z</option>
+          <option value="domain:desc">Domain Z–A</option>
+          <option value="ip:asc">IP address</option>
+          <option value="country:asc">Country</option>
+          <option value="status:asc">HTTP status</option>
+          <option value="tls:asc">Certificate days left</option>
+        </select>
+      </div>
 
-    <div class="knob knob--density">
-      <span class="knob__label" id="density-label">Frames per row</span>
-      <div class="density" role="group" aria-labelledby="density-label">
-        <button type="button" class="density__btn" data-cols="4">4</button>
-        <button type="button" class="density__btn is-on" data-cols="6" aria-pressed="true">6</button>
-        <button type="button" class="density__btn" data-cols="10">10</button>
+      <div class="knob knob--grow">
+        <label for="filter">Filter</label>
+        <input type="search" id="filter" class="field" spellcheck="false" placeholder="domain, IP, ASN…">
+      </div>
+
+      <div class="spacer"></div>
+
+      <label class="switch" for="group-toggle">
+        <input type="checkbox" id="group-toggle">
+        <span class="switch__track"></span>
+        <span class="switch__text">Group by domain</span>
+      </label>
+
+      <div class="knob">
+        <span class="knob__label" id="density-label">Per row</span>
+        <div class="segment" role="group" aria-labelledby="density-label">
+          <button type="button" class="segment__btn" data-cols="4" aria-pressed="false">4</button>
+          <button type="button" class="segment__btn is-on" data-cols="6" aria-pressed="true">6</button>
+          <button type="button" class="segment__btn" data-cols="10" aria-pressed="false">10</button>
+        </div>
       </div>
     </div>
-
-    <button type="button" id="run" class="btn btn--primary">Search</button>
   </div>
 </section>
 
-<div class="status" id="status" role="status" aria-live="polite">
-  <p class="status__line" id="status-line">Nothing on the sheet yet.</p>
-  <button type="button" id="quota" class="btn btn--ghost btn--small">Check quota</button>
-</div>
-
-<div class="alert" id="alert" role="alert" hidden>
-  <p class="alert__msg" id="alert-msg"></p>
-  <button type="button" class="alert__close" id="alert-close" aria-label="Dismiss">&times;</button>
-</div>
-
-<div class="loading" id="loading" hidden>
-  <div class="loading__bar"><span></span></div>
-  <p>Reading the archive…</p>
-</div>
-
-<main>
-  <section class="empty" id="empty">
-    <h2>Start with a query</h2>
-    <ul class="empty__examples">
-      <li><button type="button" class="example" data-q="page.domain:example.com">page.domain:example.com</button></li>
-      <li><button type="button" class="example" data-q="page.asnname:cloudflare AND page.status:200">page.asnname:cloudflare AND page.status:200</button></li>
-      <li><button type="button" class="example" data-q="task.tags:phishing">task.tags:phishing</button></li>
-      <li><button type="button" class="example" data-q="page.ip:&quot;1.1.1.1&quot;">page.ip:"1.1.1.1"</button></li>
-    </ul>
-  </section>
-
-  <section class="sheet cols-6" id="sheet" aria-label="Search results"></section>
-
-  <div class="more" id="more" hidden>
-    <button type="button" id="load-more" class="btn">Load the next page</button>
-    <p class="more__note" id="more-note"></p>
+<div class="shell">
+  <div class="statusbar" role="status" aria-live="polite">
+    <p class="statusbar__line" id="status-line">Nothing on the sheet yet.</p>
+    <div class="bulkgroup" id="bulk" hidden>
+      <button type="button" id="collapse-all" class="btn btn--ghost btn--small">Collapse all</button>
+      <button type="button" id="expand-all" class="btn btn--ghost btn--small">Expand all</button>
+    </div>
+    <div class="spacer"></div>
+    <button type="button" id="quota" class="btn btn--ghost btn--small">Check quota</button>
   </div>
-</main>
+
+  <div class="alert" id="alert" role="alert" hidden>
+    <p class="alert__msg" id="alert-msg"></p>
+    <button type="button" class="alert__close" id="alert-close" aria-label="Dismiss">&times;</button>
+  </div>
+
+  <div class="loading" id="loading" hidden>
+    <div class="loading__bar"><span></span></div>
+    <p>Reading the archive…</p>
+  </div>
+
+  <main>
+    <section class="empty" id="empty">
+      <h2>Search the archive</h2>
+      <p>Every hit comes back as a frame: the screenshot, the address that was actually contacted
+         during that scan, and how the certificate looked at the time.</p>
+      <ul class="empty__examples">
+        <li><button type="button" class="example" data-q="page.domain:example.com">page.domain:example.com</button></li>
+        <li><button type="button" class="example" data-q="page.asnname:cloudflare AND page.status:200">page.asnname:cloudflare AND page.status:200</button></li>
+        <li><button type="button" class="example" data-q="task.tags:phishing">task.tags:phishing</button></li>
+        <li><button type="button" class="example" data-q="page.ip:&quot;1.1.1.1&quot;">page.ip:"1.1.1.1"</button></li>
+      </ul>
+    </section>
+
+    <section class="sheet cols-6" id="sheet" aria-label="Search results"></section>
+
+    <div class="more" id="more" hidden>
+      <button type="button" id="load-more" class="btn">Load the next page</button>
+      <p class="more__note" id="more-note"></p>
+    </div>
+  </main>
+</div>
 
 <div class="lightbox" id="lightbox" hidden>
   <div class="lightbox__inner" role="dialog" aria-modal="true" aria-labelledby="lightbox-title">
@@ -154,6 +169,17 @@
       </dl>
     </div>
   </article>
+</template>
+
+<template id="group-tpl">
+  <section class="group">
+    <button type="button" class="group__bar" aria-expanded="true">
+      <span class="group__chev" aria-hidden="true"></span>
+      <span class="group__name"></span>
+      <span class="group__meta"></span>
+    </button>
+    <div class="group__grid"></div>
+  </section>
 </template>
 
 <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>

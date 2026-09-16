@@ -15,10 +15,15 @@
     keyReveal: document.getElementById("key-reveal"),
     keyForget: document.getElementById("key-forget"),
     keyRemember: document.getElementById("key-remember"),
+    keyNote: document.getElementById("key-note"),
     query: document.getElementById("query"),
     size: document.getElementById("size"),
     sort: document.getElementById("sort"),
     filter: document.getElementById("filter"),
+    group: document.getElementById("group-toggle"),
+    bulk: document.getElementById("bulk"),
+    collapseAll: document.getElementById("collapse-all"),
+    expandAll: document.getElementById("expand-all"),
     run: document.getElementById("run"),
     quota: document.getElementById("quota"),
     sheet: document.getElementById("sheet"),
@@ -36,7 +41,8 @@
     lightboxTitle: document.getElementById("lightbox-title"),
     lightboxFacts: document.getElementById("lightbox-facts"),
     lightboxClose: document.getElementById("lightbox-close"),
-    tpl: document.getElementById("frame-tpl")
+    frameTpl: document.getElementById("frame-tpl"),
+    groupTpl: document.getElementById("group-tpl")
   };
 
   var state = {
@@ -48,6 +54,10 @@
     totalExact: true,
     hasMore: false,
     busy: false,
+    cols: 6,
+    groupBy: false,
+    groupCount: 0,
+    collapsed: {},   // domain -> true, kept across re-renders
     lastFocus: null
   };
 
@@ -55,6 +65,10 @@
 
   function fmt(n) {
     return typeof n === "number" ? n.toLocaleString() : String(n);
+  }
+
+  function plural(n, one, many) {
+    return fmt(n) + " " + (n === 1 ? one : many);
   }
 
   function showAlert(message) {
@@ -85,6 +99,19 @@
     });
   }
 
+  function formatDay(iso) {
+    if (!iso) return "unknown";
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return "unknown";
+    return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "2-digit" });
+  }
+
+  function strong(text) {
+    var s = document.createElement("strong");
+    s.textContent = text;
+    return s;
+  }
+
   /* ------------------------------------------------------------- api key */
 
   function currentKey() {
@@ -93,6 +120,7 @@
 
   function syncKeyState() {
     el.keyPanel.classList.toggle("is-set", currentKey().length > 0);
+    el.keyNote.hidden = !el.keyRemember.checked;
   }
 
   function loadStoredKey() {
@@ -120,6 +148,7 @@
       showAlert("This browser blocked local storage, so the key will not be kept between visits.");
       el.keyRemember.checked = false;
     }
+    syncKeyState();
   }
 
   /* -------------------------------------------------------------- request */
@@ -150,7 +179,7 @@
       });
   }
 
-  /* -------------------------------------------------------------- render */
+  /* ------------------------------------------------------------- signals */
 
   function statusText(result) {
     var s = result.status;
@@ -176,8 +205,10 @@
     return { text: label, cls: days <= 14 ? "flag--warn" : "" };
   }
 
+  /* -------------------------------------------------------------- frames */
+
   function buildFrame(result) {
-    var node = el.tpl.content.firstElementChild.cloneNode(true);
+    var node = el.frameTpl.content.firstElementChild.cloneNode(true);
     var shot = node.querySelector(".shot");
     var img = node.querySelector(".shot__img");
     var domain = node.querySelector(".frame__domain");
@@ -187,9 +218,7 @@
     if (result.screenshot) {
       img.src = result.screenshot;
       img.alt = "Screenshot of " + (result.domain || "this page");
-      img.addEventListener("error", function () {
-        shot.classList.add("is-blank");
-      });
+      img.addEventListener("error", function () { shot.classList.add("is-blank"); });
       shot.addEventListener("click", function () { openLightbox(result); });
     } else {
       shot.classList.add("is-blank");
@@ -233,6 +262,94 @@
     return node;
   }
 
+  /* -------------------------------------------------------------- groups */
+
+  function groupKey(result) {
+    return result.domain || "Unknown domain";
+  }
+
+  /* Group in the order the sorted list produced, so the chosen sort still
+     decides which domain appears first. */
+  function groupResults(ordered) {
+    var map = new Map();
+    ordered.forEach(function (result) {
+      var key = groupKey(result);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(result);
+    });
+    return map;
+  }
+
+  function chip(text, alert) {
+    var span = document.createElement("span");
+    span.className = alert ? "chip chip--alert" : "chip";
+    span.textContent = text;
+    return span;
+  }
+
+  function buildGroup(domain, items) {
+    var node = el.groupTpl.content.firstElementChild.cloneNode(true);
+    var bar = node.querySelector(".group__bar");
+    var meta = node.querySelector(".group__meta");
+    var grid = node.querySelector(".group__grid");
+
+    node.dataset.domain = domain;
+    node.querySelector(".group__name").textContent = domain;
+
+    var ips = {};
+    var failing = 0;
+    var latest = null;
+    items.forEach(function (r) {
+      if (r.ip) ips[r.ip] = true;
+      var code = parseInt(r.status, 10);
+      if (!isNaN(code) && code >= 400) failing += 1;
+      if (r.time && (!latest || r.time > latest)) latest = r.time;
+    });
+
+    meta.appendChild(chip(plural(items.length, "scan", "scans")));
+    meta.appendChild(chip(plural(Object.keys(ips).length, "address", "addresses")));
+    if (failing) meta.appendChild(chip(failing + " failing", true));
+    meta.appendChild(chip("last seen " + formatDay(latest)));
+
+    items.forEach(function (r) { grid.appendChild(buildFrame(r)); });
+
+    var collapsed = !!state.collapsed[domain];
+    node.classList.toggle("is-collapsed", collapsed);
+    bar.setAttribute("aria-expanded", String(!collapsed));
+
+    bar.addEventListener("click", function () {
+      var nowCollapsed = !node.classList.contains("is-collapsed");
+      node.classList.toggle("is-collapsed", nowCollapsed);
+      bar.setAttribute("aria-expanded", String(!nowCollapsed));
+      if (nowCollapsed) state.collapsed[domain] = true;
+      else delete state.collapsed[domain];
+    });
+
+    return node;
+  }
+
+  function setAllCollapsed(collapsed) {
+    Array.prototype.forEach.call(el.sheet.querySelectorAll(".group"), function (group) {
+      var domain = group.dataset.domain;
+      group.classList.toggle("is-collapsed", collapsed);
+      group.querySelector(".group__bar").setAttribute("aria-expanded", String(!collapsed));
+      if (collapsed) state.collapsed[domain] = true;
+      else delete state.collapsed[domain];
+    });
+  }
+
+  /* -------------------------------------------------------------- sorting */
+
+  /* Sort IPv4 numerically so 10.0.0.9 lands before 10.0.0.10. */
+  function ipKey(ip) {
+    if (!ip) return "";
+    var octets = ip.split(".");
+    if (octets.length === 4 && octets.every(function (o) { return /^\d{1,3}$/.test(o); })) {
+      return octets.map(function (o) { return o.padStart(3, "0"); }).join(".");
+    }
+    return ip.toLowerCase();
+  }
+
   function sortResults(list) {
     var parts = el.sort.value.split(":");
     var field = parts[0];
@@ -258,25 +375,37 @@
     });
   }
 
-  /* Sort IPv4 numerically so 10.0.0.9 lands before 10.0.0.10. */
-  function ipKey(ip) {
-    if (!ip) return "";
-    var octets = ip.split(".");
-    if (octets.length === 4 && octets.every(function (o) { return /^\d{1,3}$/.test(o); })) {
-      return octets.map(function (o) { return o.padStart(3, "0"); }).join(".");
-    }
-    return ip.toLowerCase();
+  /* ------------------------------------------------------------ rendering */
+
+  function applyLayout() {
+    var classes = ["sheet", "cols-" + state.cols];
+    if (state.groupBy) classes.push("is-grouped");
+    if ((el.filter.value || "").trim()) classes.push("is-filtering");
+    el.sheet.className = classes.join(" ");
   }
 
   function render() {
     var ordered = sortResults(state.results);
     var fragment = document.createDocumentFragment();
-    ordered.forEach(function (result) { fragment.appendChild(buildFrame(result)); });
+
+    if (state.groupBy) {
+      var groups = groupResults(ordered);
+      state.groupCount = groups.size;
+      groups.forEach(function (items, domain) {
+        fragment.appendChild(buildGroup(domain, items));
+      });
+    } else {
+      state.groupCount = 0;
+      ordered.forEach(function (result) { fragment.appendChild(buildFrame(result)); });
+    }
 
     el.sheet.textContent = "";
     el.sheet.appendChild(fragment);
 
     el.empty.hidden = state.results.length > 0;
+    el.bulk.hidden = !(state.groupBy && state.results.length);
+
+    applyLayout();
     updateStatus();
     applyFilter();
   }
@@ -284,11 +413,22 @@
   function applyFilter() {
     var term = (el.filter.value || "").trim().toLowerCase();
     var shown = 0;
-    Array.prototype.forEach.call(el.sheet.children, function (frame) {
+
+    Array.prototype.forEach.call(el.sheet.querySelectorAll(".frame"), function (frame) {
       var match = !term || frame.dataset.haystack.indexOf(term) !== -1;
       frame.classList.toggle("is-hidden", !match);
       if (match) shown += 1;
     });
+
+    // A group with nothing left in it just becomes noise.
+    var groupsShown = 0;
+    Array.prototype.forEach.call(el.sheet.querySelectorAll(".group"), function (group) {
+      var visible = group.querySelectorAll(".frame:not(.is-hidden)").length;
+      group.hidden = visible === 0;
+      if (visible) groupsShown += 1;
+    });
+
+    applyLayout();
 
     if (!term) {
       updateStatus();
@@ -299,14 +439,12 @@
     el.status.append(
       document.createTextNode("Showing "),
       strong(fmt(shown)),
-      document.createTextNode(" of " + fmt(state.results.length) + " loaded frames.")
+      document.createTextNode(" of " + fmt(state.results.length) + " loaded frames")
     );
-  }
-
-  function strong(text) {
-    var s = document.createElement("strong");
-    s.textContent = text;
-    return s;
+    if (state.groupBy) {
+      el.status.append(document.createTextNode(" across " + plural(groupsShown, "domain", "domains")));
+    }
+    el.status.append(document.createTextNode("."));
   }
 
   function updateStatus() {
@@ -317,13 +455,18 @@
     }
 
     el.status.textContent = "";
-    el.status.append(strong(fmt(state.results.length)), document.createTextNode(" frames loaded"));
+    el.status.append(strong(fmt(state.results.length)), document.createTextNode(" frames"));
+
+    if (state.groupBy) {
+      el.status.append(document.createTextNode(" in " + plural(state.groupCount, "domain", "domains")));
+    }
 
     if (typeof state.total === "number") {
-      var totalLabel = state.totalExact
-        ? " of " + fmt(state.total) + " matches"
-        : " of more than " + fmt(state.total) + " matches";
-      el.status.append(document.createTextNode(totalLabel));
+      el.status.append(document.createTextNode(
+        state.totalExact
+          ? " of " + fmt(state.total) + " matches"
+          : " of more than " + fmt(state.total) + " matches"
+      ));
     }
     el.status.append(document.createTextNode("."));
 
@@ -367,6 +510,7 @@
           state.results = state.results.concat(incoming);
         } else {
           state.results = incoming;
+          state.collapsed = {};
           window.scrollTo({ top: 0, behavior: "smooth" });
         }
 
@@ -402,12 +546,11 @@
           el.status.textContent = "urlscan did not report a search quota for this key.";
           return;
         }
-        var text = windows.map(function (w) {
+        el.status.textContent = windows.map(function (w) {
           var q = search[w];
           var left = (q.limit || 0) - (q.used || 0);
           return left + " of " + q.limit + " searches left this " + w;
-        }).join(" — ");
-        el.status.textContent = text + ".";
+        }).join(", ") + ".";
       })
       .catch(function (err) { showAlert(err.message); });
   }
@@ -479,6 +622,14 @@
   el.sort.addEventListener("change", render);
   el.filter.addEventListener("input", applyFilter);
 
+  el.group.addEventListener("change", function () {
+    state.groupBy = el.group.checked;
+    render();
+  });
+
+  el.collapseAll.addEventListener("click", function () { setAllCollapsed(true); });
+  el.expandAll.addEventListener("click", function () { setAllCollapsed(false); });
+
   el.query.addEventListener("keydown", function (event) {
     if (event.key === "Enter") { event.preventDefault(); runSearch(false); }
   });
@@ -501,11 +652,11 @@
     el.key.focus();
   });
 
-  Array.prototype.forEach.call(document.querySelectorAll(".density__btn"), function (button) {
+  Array.prototype.forEach.call(document.querySelectorAll(".segment__btn"), function (button) {
     button.addEventListener("click", function () {
-      var cols = button.dataset.cols;
-      el.sheet.className = "sheet cols-" + cols;
-      document.querySelectorAll(".density__btn").forEach(function (b) {
+      state.cols = parseInt(button.dataset.cols, 10);
+      applyLayout();
+      document.querySelectorAll(".segment__btn").forEach(function (b) {
         b.classList.toggle("is-on", b === button);
         b.setAttribute("aria-pressed", String(b === button));
       });

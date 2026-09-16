@@ -178,8 +178,18 @@ of screenshots, so start at 100 and work up.
 **Frames per row** switches between 4, 6 and 10 columns. At 10 the field labels drop away and the
 frames tighten up for fast scanning; the layout collapses further on narrow screens regardless.
 
-**Order** and **Filter these results** both work on the frames already loaded, client-side, with no
-extra API calls. To sort across the whole result set instead, put the constraint in the query.
+**Group by domain** folds every scan of the same host into one collapsible section. The bar shows the
+scan count, how many distinct IPs that domain was seen on, a red count of failing responses if there
+are any, and the most recent scan date. Click a bar to collapse it, or use **Collapse all** for a
+dense one-row-per-domain list — useful when a wildcard query returns hundreds of scans across a few
+hosts. Collapse state survives re-sorting and loading more pages; a new search clears it.
+
+Filtering while groups are collapsed temporarily opens them, so a match can never hide behind a
+collapsed bar. Clearing the filter restores whatever was collapsed before.
+
+**Order** and **Filter** both work on the frames already loaded, client-side, with no extra API
+calls. With grouping on, the order also decides which domain appears first. To sort across the whole
+result set instead, put the constraint in the query.
 
 **Check quota** reads `/api/v1/quotas` and reports how many searches your key has left this minute,
 hour and day. urlscan meters each action type separately, so a search quota and a scan-submission
