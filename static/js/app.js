@@ -19,6 +19,7 @@
     size: document.getElementById("size"),
     sort: document.getElementById("sort"),
     filter: document.getElementById("filter"),
+    collapseDomain: document.getElementById("collapse-domain"),
     run: document.getElementById("run"),
     quota: document.getElementById("quota"),
     sheet: document.getElementById("sheet"),
@@ -258,6 +259,22 @@
     });
   }
 
+  function collapseToLatest(list) {
+    var latest = new Map();
+
+    list.forEach(function (result) {
+      var domain = (result.domain || "").trim().toLowerCase();
+      var key = domain || "__missing_domain_" + result.index;
+      var current = latest.get(key);
+      var resultTime = result.time ? Date.parse(result.time) || 0 : 0;
+      var currentTime = current && current.time ? Date.parse(current.time) || 0 : 0;
+
+      if (!current || resultTime > currentTime) latest.set(key, result);
+    });
+
+    return Array.from(latest.values());
+  }
+
   /* Sort IPv4 numerically so 10.0.0.9 lands before 10.0.0.10. */
   function ipKey(ip) {
     if (!ip) return "";
@@ -269,7 +286,11 @@
   }
 
   function render() {
-    var ordered = sortResults(state.results);
+    var displayResults = el.collapseDomain.checked
+      ? collapseToLatest(state.results)
+      : state.results;
+    var ordered = sortResults(displayResults);
+    state.displayedCount = ordered.length;
     var fragment = document.createDocumentFragment();
     ordered.forEach(function (result) { fragment.appendChild(buildFrame(result)); });
 
@@ -299,7 +320,7 @@
     el.status.append(
       document.createTextNode("Showing "),
       strong(fmt(shown)),
-      document.createTextNode(" of " + fmt(state.results.length) + " loaded frames.")
+      document.createTextNode(" of " + fmt(state.displayedCount) + " displayed frames.")
     );
   }
 
@@ -317,7 +338,16 @@
     }
 
     el.status.textContent = "";
-    el.status.append(strong(fmt(state.results.length)), document.createTextNode(" frames loaded"));
+    if (state.displayedCount !== state.results.length) {
+      el.status.append(
+        strong(fmt(state.displayedCount)),
+        document.createTextNode(" displayed from "),
+        strong(fmt(state.results.length)),
+        document.createTextNode(" loaded frames")
+      );
+    } else {
+      el.status.append(strong(fmt(state.results.length)), document.createTextNode(" frames loaded"));
+    }
 
     if (typeof state.total === "number") {
       var totalLabel = state.totalExact
@@ -478,6 +508,7 @@
   el.alertClose.addEventListener("click", clearAlert);
   el.sort.addEventListener("change", render);
   el.filter.addEventListener("input", applyFilter);
+  el.collapseDomain.addEventListener("change", render);
 
   el.query.addEventListener("keydown", function (event) {
     if (event.key === "Enter") { event.preventDefault(); runSearch(false); }

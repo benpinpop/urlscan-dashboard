@@ -12,7 +12,7 @@
 
 <header class="sheet-head">
   <div class="sheet-head__title">
-    <h1>Contact sheet</h1>
+    <h1>URLScan Screenshot Viewer</h1>
     <p>Search the urlscan.io archive and read every hit as a frame: screenshot, the address it actually
        contacted, and how its certificate looked at scan time.</p>
   </div>
@@ -85,6 +85,14 @@
         <button type="button" class="density__btn" data-cols="10">10</button>
       </div>
     </div>
+
+    <label class="knob knob--collapse" for="collapse-domain">
+      <span class="knob__label">Reduce duplicates</span>
+      <span class="toggle">
+        <input type="checkbox" id="collapse-domain">
+        <span>Latest scan per domain</span>
+      </span>
+    </label>
 
     <button type="button" id="run" class="btn btn--primary">Search</button>
   </div>

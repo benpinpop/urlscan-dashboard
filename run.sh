@@ -21,5 +21,5 @@ if [ ! -f .env ] && [ -f .env.example ]; then
 fi
 
 # gunicorn.conf.py loads .env itself, so no shell export dance is needed.
-echo "Starting. Settings come from .env; default is http://127.0.0.1:8000"
+echo "Starting. Settings come from .env; default is http://0.0.0.0:8000"
 exec gunicorn -c gunicorn.conf.py wsgi:application
