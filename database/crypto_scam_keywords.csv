@@ -1,0 +1,508 @@
+keyword,category,weight
+bitcoin,crypto_context,1
+btc,crypto_context,1
+ethereum,crypto_context,1
+eth,crypto_context,1
+usdt,crypto_context,1
+tether,crypto_context,1
+usdc,crypto_context,1
+bnb,crypto_context,1
+tron,crypto_context,1
+trx,crypto_context,1
+trc20,crypto_context,1
+erc20,crypto_context,1
+bep20,crypto_context,1
+blockchain,crypto_context,1
+crypto,crypto_context,1
+cryptocurrency,crypto_context,1
+digital assets,crypto_context,1
+web3,crypto_context,1
+altcoin,crypto_context,1
+stablecoin,crypto_context,1
+satoshi,crypto_context,1
+wallet address,crypto_context,1
+smart contract,crypto_context,1
+decentralized,crypto_context,1
+defi,crypto_context,1
+dapp,crypto_context,1
+token,crypto_context,1
+on-chain,crypto_context,1
+guaranteed returns,yield_promise,5
+guaranteed profit,yield_promise,5
+guaranteed daily profit,yield_promise,5
+guaranteed roi,yield_promise,5
+fixed daily returns,yield_promise,5
+fixed daily interest,yield_promise,5
+daily returns,yield_promise,5
+daily profit,yield_promise,5
+daily payout,yield_promise,5
+hourly profit,yield_promise,5
+hourly returns,yield_promise,5
+weekly returns,yield_promise,4
+monthly returns,yield_promise,3
+percent daily,yield_promise,5
+percent per day,yield_promise,5
+percent hourly,yield_promise,5
+1.5% daily,yield_promise,5
+2% daily,yield_promise,5
+3% daily,yield_promise,5
+5% daily,yield_promise,5
+10% daily,yield_promise,5
+percent weekly,yield_promise,4
+roi,yield_promise,3
+return on investment,yield_promise,3
+high yield,yield_promise,4
+hyip,yield_promise,5
+high yield investment,yield_promise,5
+high yield investment program,yield_promise,5
+passive crypto income,yield_promise,4
+passive income,yield_promise,3
+residual income,yield_promise,3
+earn while you sleep,yield_promise,4
+earn daily,yield_promise,4
+earn bitcoin daily,yield_promise,5
+double your bitcoin,yield_promise,5
+double your crypto,yield_promise,5
+double your investment,yield_promise,5
+triple your investment,yield_promise,5
+10x your investment,yield_promise,5
+100x returns,yield_promise,5
+multiply your crypto,yield_promise,5
+compound daily,yield_promise,4
+auto compounding,yield_promise,3
+daily compounding,yield_promise,4
+profit every 24 hours,yield_promise,5
+instant profit,yield_promise,5
+instant payout,yield_promise,4
+guaranteed payout,yield_promise,5
+never lose money,yield_promise,5
+small investment big returns,yield_promise,5
+risk-free,risk_denial,5
+risk free,risk_denial,5
+zero risk,risk_denial,5
+no risk investment,risk_denial,5
+no loss,risk_denial,5
+never lose,risk_denial,5
+loss free,risk_denial,5
+100% safe,risk_denial,5
+100% secure,risk_denial,4
+100% guaranteed,risk_denial,5
+completely safe,risk_denial,4
+capital protected,risk_denial,4
+capital protection,risk_denial,4
+capital guarantee,risk_denial,5
+principal protected,risk_denial,4
+principal guaranteed,risk_denial,5
+funds are insured,risk_denial,4
+insured deposit,risk_denial,4
+insurance fund covers,risk_denial,4
+sec insured,risk_denial,5
+fdic insured,risk_denial,4
+bank grade security,risk_denial,3
+military grade encryption,risk_denial,3
+we cover your losses,risk_denial,5
+loss recovery guarantee,risk_denial,5
+no downside,risk_denial,5
+guaranteed against loss,risk_denial,5
+money back guarantee,risk_denial,3
+investment plan,hyip_plan_structure,3
+investment package,hyip_plan_structure,3
+investment tier,hyip_plan_structure,3
+starter plan,hyip_plan_structure,3
+starter package,hyip_plan_structure,3
+basic plan,hyip_plan_structure,2
+silver plan,hyip_plan_structure,3
+gold plan,hyip_plan_structure,3
+platinum plan,hyip_plan_structure,3
+diamond plan,hyip_plan_structure,3
+vip plan,hyip_plan_structure,3
+premium plan,hyip_plan_structure,2
+minimum deposit,hyip_plan_structure,2
+maximum deposit,hyip_plan_structure,2
+deposit plan,hyip_plan_structure,3
+contract period,hyip_plan_structure,2
+investment term,hyip_plan_structure,2
+maturity date,hyip_plan_structure,2
+lock-in period,hyip_plan_structure,2
+daily cycle,hyip_plan_structure,3
+principal returned,hyip_plan_structure,3
+principal included,hyip_plan_structure,3
+after 24 hours,hyip_plan_structure,3
+after 7 days,hyip_plan_structure,2
+plan duration,hyip_plan_structure,2
+reinvest,hyip_plan_structure,2
+reinvestment plan,hyip_plan_structure,3
+upgrade your plan,hyip_plan_structure,3
+upgrade your account,hyip_plan_structure,3
+active deposit,hyip_plan_structure,2
+total invested,hyip_plan_structure,2
+accrued profit,hyip_plan_structure,3
+running plans,hyip_plan_structure,3
+my deposits,hyip_plan_structure,2
+profit calculator,hyip_plan_structure,3
+earnings calculator,hyip_plan_structure,3
+withdrawal fee,withdrawal_trap,4
+verify to withdraw,withdrawal_trap,5
+verification fee,withdrawal_trap,5
+account verification fee,withdrawal_trap,5
+activation fee,withdrawal_trap,5
+wallet activation fee,withdrawal_trap,5
+unlock funds,withdrawal_trap,5
+unlock your account,withdrawal_trap,4
+release fee,withdrawal_trap,5
+tax fee,withdrawal_trap,5
+tax clearance,withdrawal_trap,5
+capital gains fee,withdrawal_trap,5
+withdrawal tax,withdrawal_trap,5
+clearance fee,withdrawal_trap,5
+clearance certificate,withdrawal_trap,5
+compliance fee,withdrawal_trap,5
+aml fee,withdrawal_trap,5
+anti money laundering fee,withdrawal_trap,5
+insurance fee,withdrawal_trap,5
+security deposit required,withdrawal_trap,5
+network fee required,withdrawal_trap,4
+gas fee required,withdrawal_trap,4
+miner fee required,withdrawal_trap,4
+smart contract fee,withdrawal_trap,4
+upgrade to withdraw,withdrawal_trap,5
+deposit to withdraw,withdrawal_trap,5
+pay to withdraw,withdrawal_trap,5
+convert to withdraw,withdrawal_trap,4
+minimum balance to withdraw,withdrawal_trap,4
+withdrawal limit reached,withdrawal_trap,4
+withdrawal pending approval,withdrawal_trap,4
+withdrawal under review,withdrawal_trap,4
+withdrawal declined,withdrawal_trap,3
+account frozen,withdrawal_trap,4
+account suspended,withdrawal_trap,4
+account locked,withdrawal_trap,4
+funds on hold,withdrawal_trap,4
+final payment required,withdrawal_trap,5
+one last payment,withdrawal_trap,5
+settle the balance to release,withdrawal_trap,5
+kyc fee,withdrawal_trap,5
+referral bonus,referral_ponzi,3
+referral commission,referral_ponzi,3
+referral link,referral_ponzi,2
+referral code,referral_ponzi,2
+referral program,referral_ponzi,2
+affiliate program,referral_ponzi,2
+affiliate commission,referral_ponzi,2
+invite and earn,referral_ponzi,3
+refer and earn,referral_ponzi,3
+multi level,referral_ponzi,4
+multi level marketing,referral_ponzi,4
+mlm,referral_ponzi,4
+matrix plan,referral_ponzi,4
+binary plan,referral_ponzi,3
+downline,referral_ponzi,4
+upline,referral_ponzi,4
+level 1 commission,referral_ponzi,4
+level income,referral_ponzi,4
+team commission,referral_ponzi,3
+recruitment bonus,referral_ponzi,4
+build your team,referral_ponzi,2
+sponsor id,referral_ponzi,3
+pyramid,referral_ponzi,4
+ponzi,referral_ponzi,4
+network marketing,referral_ponzi,3
+5% referral,referral_ponzi,3
+10% referral,referral_ponzi,3
+unilevel,referral_ponzi,4
+3 level referral,referral_ponzi,4
+ai trading bot,ai_bot_claims,4
+ai powered trading,ai_bot_claims,4
+ai trading,ai_bot_claims,3
+gpt trading,ai_bot_claims,4
+trading bot,ai_bot_claims,3
+bot never loses,ai_bot_claims,5
+proprietary algorithm,ai_bot_claims,3
+quantum ai,ai_bot_claims,5
+quantum trading,ai_bot_claims,5
+quantum computing trading,ai_bot_claims,5
+neural network trading,ai_bot_claims,4
+machine learning profits,ai_bot_claims,4
+arbitrage bot,ai_bot_claims,4
+arbitrage trading,ai_bot_claims,3
+triangular arbitrage,ai_bot_claims,3
+cross exchange arbitrage,ai_bot_claims,3
+flash loan profit,ai_bot_claims,4
+mev bot,ai_bot_claims,4
+sniper bot,ai_bot_claims,3
+automated trading,ai_bot_claims,3
+auto trade,ai_bot_claims,3
+algorithmic trading,ai_bot_claims,2
+trading signals,ai_bot_claims,2
+vip signals,ai_bot_claims,3
+signal group,ai_bot_claims,3
+copy trading,ai_bot_claims,2
+mirror trading,ai_bot_claims,2
+managed crypto account,ai_bot_claims,4
+expert traders manage,ai_bot_claims,4
+our traders never lose,ai_bot_claims,5
+cloud mining,mining_staking_claims,3
+mining contract,mining_staking_claims,3
+mining plan,mining_staking_claims,3
+hash power rental,mining_staking_claims,3
+rent hashpower,mining_staking_claims,3
+gh/s plan,mining_staking_claims,3
+th/s contract,mining_staking_claims,3
+mining rig investment,mining_staking_claims,3
+free mining,mining_staking_claims,4
+daily mining rewards,mining_staking_claims,4
+staking plan,mining_staking_claims,3
+staking rewards,mining_staking_claims,2
+guaranteed staking rewards,mining_staking_claims,5
+high apy,mining_staking_claims,3
+apy,mining_staking_claims,1
+1000% apy,mining_staking_claims,5
+yield farming,mining_staking_claims,1
+liquidity mining,mining_staking_claims,2
+auto compounding vault,mining_staking_claims,3
+masternode investment,mining_staking_claims,3
+node rental,mining_staking_claims,3
+validator returns,mining_staking_claims,3
+defi yield optimizer,mining_staking_claims,3
+presale,token_presale,2
+private sale,token_presale,2
+token sale,token_presale,2
+ico,token_presale,2
+ido,token_presale,2
+seed round open,token_presale,2
+guaranteed listing,token_presale,5
+listing on binance,token_presale,4
+listing on coinbase,token_presale,4
+will be listed soon,token_presale,4
+price will 100x after listing,token_presale,5
+next big token,token_presale,4
+next bitcoin,token_presale,5
+next ethereum,token_presale,5
+early investors only,token_presale,4
+tokenomics,token_presale,1
+whitepaper,token_presale,1
+airdrop,token_presale,2
+free tokens,token_presale,3
+claim your tokens,token_presale,3
+buy before listing,token_presale,4
+guaranteed allocation,token_presale,4
+bonus tokens,token_presale,3
+token price increases,token_presale,3
+audited by certik,fake_audit_security,3
+certik audited,fake_audit_security,3
+audit passed,fake_audit_security,2
+smart contract audited,fake_audit_security,2
+fully audited,fake_audit_security,3
+liquidity locked,fake_audit_security,2
+liquidity locked forever,fake_audit_security,4
+ownership renounced,fake_audit_security,2
+contract verified,fake_audit_security,2
+kyc verified team,fake_audit_security,3
+doxxed team,fake_audit_security,2
+no honeypot,fake_audit_security,3
+safu,fake_audit_security,3
+security audit report,fake_audit_security,2
+sec licensed,fake_legitimacy,4
+sec registered,fake_legitimacy,3
+government approved,fake_legitimacy,4
+government backed,fake_legitimacy,4
+central bank approved,fake_legitimacy,4
+un approved,fake_legitimacy,5
+imf approved,fake_legitimacy,5
+world bank program,fake_legitimacy,5
+fca regulated,fake_legitimacy,3
+cysec regulated,fake_legitimacy,2
+finra approved,fake_legitimacy,3
+licensed exchange,fake_legitimacy,2
+regulated exchange,fake_legitimacy,2
+registered company,fake_legitimacy,1
+registration number,fake_legitimacy,2
+certificate of incorporation,fake_legitimacy,2
+official partner,fake_legitimacy,2
+partnered with binance,fake_legitimacy,4
+award winning platform,fake_legitimacy,3
+license number,fake_legitimacy,2
+fully compliant,fake_legitimacy,2
+trust score,fake_legitimacy,2
+verified platform,fake_legitimacy,2
+legal and registered,fake_legitimacy,3
+elon musk,fake_endorsement,5
+elon musk giveaway,fake_endorsement,5
+official musk,fake_endorsement,5
+tesla partnership,fake_endorsement,4
+michael saylor,fake_endorsement,3
+saylor giveaway,fake_endorsement,5
+cz endorsed,fake_endorsement,4
+binance partnership,fake_endorsement,4
+celebrity endorsed,fake_endorsement,5
+celebrity trader,fake_endorsement,4
+as seen on,fake_endorsement,4
+shark tank,fake_endorsement,5
+dragons den,fake_endorsement,5
+featured on forbes,fake_endorsement,4
+featured on cnbc,fake_endorsement,4
+featured on bloomberg,fake_endorsement,4
+endorsed by,fake_endorsement,3
+billionaire backed,fake_endorsement,4
+warren buffett strategy,fake_endorsement,4
+recommended by experts,fake_endorsement,3
+guaranteed win rate,fake_metrics,5
+98% win rate,fake_metrics,5
+99% accuracy,fake_metrics,5
+99.9% uptime,fake_metrics,2
+win rate,fake_metrics,3
+accuracy rate,fake_metrics,2
+never had a losing day,fake_metrics,5
+zero losing trades,fake_metrics,5
+backtested returns guaranteed,fake_metrics,4
+profit factor guaranteed,fake_metrics,4
+total paid out,fake_metrics,3
+investors worldwide,fake_metrics,2
+active investors,fake_metrics,2
+total deposits,fake_metrics,2
+running since,fake_metrics,2
+paying since,fake_metrics,3
+live payouts,proof_fabrication,3
+recent payouts,proof_fabrication,3
+last payouts,proof_fabrication,3
+payout proof,proof_fabrication,3
+withdrawal proof,proof_fabrication,4
+live withdrawal feed,proof_fabrication,4
+recent withdrawals,proof_fabrication,3
+payment proof,proof_fabrication,4
+profit screenshot,proof_fabrication,4
+transaction hash proof,proof_fabrication,3
+verified reviews,proof_fabrication,2
+trustpilot reviews,proof_fabrication,2
+testimonial,proof_fabrication,1
+success story,proof_fabrication,2
+our investors say,proof_fabrication,2
+paid today,proof_fabrication,3
+limited time offer,urgency_scarcity,3
+limited slots,urgency_scarcity,3
+limited spots,urgency_scarcity,3
+spots left,urgency_scarcity,3
+act now,urgency_scarcity,4
+act fast,urgency_scarcity,4
+last chance,urgency_scarcity,3
+final chance,urgency_scarcity,4
+offer ends,urgency_scarcity,3
+offer expires,urgency_scarcity,3
+expires today,urgency_scarcity,4
+today only,urgency_scarcity,4
+24 hours only,urgency_scarcity,4
+closing soon,urgency_scarcity,3
+hurry,urgency_scarcity,3
+don't miss out,urgency_scarcity,3
+dont miss out,urgency_scarcity,3
+before it's too late,urgency_scarcity,4
+deposit today,urgency_scarcity,4
+deposit before,urgency_scarcity,4
+price will increase,urgency_scarcity,3
+bonus ends soon,urgency_scarcity,3
+first come first served,urgency_scarcity,2
+few slots remaining,urgency_scarcity,4
+countdown,urgency_scarcity,2
+exclusive invite,urgency_scarcity,3
+vip access,urgency_scarcity,2
+join now,urgency_scarcity,2
+register now,urgency_scarcity,2
+send 1 get 2,giveaway_doubler,5
+send 1 btc get 2 btc,giveaway_doubler,5
+double your bitcoin giveaway,giveaway_doubler,5
+giveaway,giveaway_doubler,3
+crypto giveaway,giveaway_doubler,5
+official giveaway,giveaway_doubler,5
+you have won,giveaway_doubler,4
+lucky winner,giveaway_doubler,4
+select few winners,giveaway_doubler,4
+claim your reward,giveaway_doubler,3
+verification address,giveaway_doubler,4
+send to participate,giveaway_doubler,5
+promotion event,giveaway_doubler,3
+2x back,giveaway_doubler,5
+guaranteed 2x,giveaway_doubler,5
+connect your wallet,wallet_drainer,3
+connect wallet to claim,wallet_drainer,5
+approve this transaction,wallet_drainer,3
+token approval,wallet_drainer,2
+sign this message,wallet_drainer,3
+validate your wallet,wallet_drainer,5
+sync your wallet,wallet_drainer,5
+wallet validation,wallet_drainer,5
+restore your wallet,wallet_drainer,5
+import your wallet,wallet_drainer,4
+seed phrase,wallet_drainer,4
+recovery phrase,wallet_drainer,4
+12 word phrase,wallet_drainer,5
+24 word phrase,wallet_drainer,5
+enter your private key,wallet_drainer,5
+private key,wallet_drainer,4
+bridge your funds,wallet_drainer,3
+migrate your tokens,wallet_drainer,4
+add more funds,deposit_escalation,3
+increase your capital,deposit_escalation,3
+one more deposit,deposit_escalation,5
+top up to unlock,deposit_escalation,5
+insufficient balance to withdraw,deposit_escalation,5
+upgrade tier to withdraw,deposit_escalation,5
+match your balance,deposit_escalation,4
+close to the next level,deposit_escalation,3
+reach the minimum,deposit_escalation,3
+top up,deposit_escalation,2
+send usdt to,crypto_rails,4
+send btc to,crypto_rails,4
+deposit address,crypto_rails,2
+send to this address,crypto_rails,4
+pay in usdt,crypto_rails,3
+usdt trc20 only,crypto_rails,3
+crypto only,crypto_rails,3
+no refunds,crypto_rails,3
+irreversible transaction,crypto_rails,2
+p2p transfer,crypto_rails,2
+otc desk,crypto_rails,2
+bitcoin atm,crypto_rails,3
+qr code payment,crypto_rails,2
+no kyc required,offshore_opacity,4
+anonymous account,offshore_opacity,4
+anonymous investment,offshore_opacity,4
+offshore account,offshore_opacity,3
+registered in seychelles,offshore_opacity,2
+saint vincent,offshore_opacity,2
+marshall islands,offshore_opacity,2
+belize registered,offshore_opacity,2
+vanuatu,offshore_opacity,2
+no tax jurisdiction,offshore_opacity,3
+tax free profits,offshore_opacity,4
+bypass the bank,offshore_opacity,4
+avoid reporting,offshore_opacity,4
+telegram support,contact_channel,3
+telegram group,contact_channel,3
+join our telegram,contact_channel,3
+join our channel,contact_channel,2
+whatsapp support,contact_channel,3
+contact us on telegram,contact_channel,4
+account manager,contact_channel,3
+personal advisor,contact_channel,3
+relationship manager,contact_channel,3
+dedicated manager,contact_channel,3
+live chat only,contact_channel,2
+support 24/7,contact_channel,1
+100% legit,hype_language,4
+legit paying site,hype_language,5
+we are not a scam,hype_language,5
+no scam,hype_language,4
+not a ponzi,hype_language,5
+trusted platform,hype_language,2
+financial freedom,hype_language,3
+life changing opportunity,hype_language,4
+change your life,hype_language,3
+to the moon,hype_language,2
+secure your future,hype_language,2
+join thousands,hype_language,2
+what banks don't want,hype_language,5
+secret strategy,hype_language,4
+insider information,hype_language,4
+loophole,hype_language,4
+instant rich,hype_language,4
+get rich quick,hype_language,4
