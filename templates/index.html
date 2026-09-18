@@ -38,9 +38,11 @@
 
 <section class="console" aria-label="Search controls">
   <div class="console__query">
-    <label for="query">Query</label>
-    <input type="search" id="query" class="field field--query" spellcheck="false"
-           placeholder="page.domain:example.com" value="">
+    <div class="query-row">
+      <input type="search" id="query" class="field field--query" spellcheck="false"
+             placeholder="page.domain:example.com" value="">
+      <button type="button" id="run" class="btn btn--primary">Search</button>
+    </div>
     <p class="hint">
       Elasticsearch query syntax. Combine fields with AND / OR, for example
       <code>page.domain:example.com AND page.status:200</code>.
@@ -48,33 +50,44 @@
   </div>
 
   <div class="console__knobs">
-    <div class="knob">
-      <label for="size">Results per page</label>
-      <select id="size" class="field">
-        {% for s in sizes %}
-        <option value="{{ s }}"{% if s == 100 %} selected{% endif %}>{{ '{:,}'.format(s) }}</option>
-        {% endfor %}
-      </select>
+    <div class="query-options">
+      <div class="knob">
+        <label for="size">Results per page</label>
+        <select id="size" class="field">
+          {% for s in sizes %}
+          <option value="{{ s }}"{% if s == 100 %} selected{% endif %}>{{ '{:,}'.format(s) }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <label class="knob knob--collapse" for="resolve-dns">
+        <span class="knob__label">DNS resolution</span>
+        <span class="toggle">
+          <input type="checkbox" id="resolve-dns">
+          <span>Check live status</span>
+        </span>
+      </label>
     </div>
 
-    <div class="knob">
-      <label for="sort">Order</label>
-      <select id="sort" class="field">
-        <option value="time:desc" selected>Newest scan first</option>
-        <option value="time:asc">Oldest scan first</option>
-        <option value="domain:asc">Domain A–Z</option>
-        <option value="domain:desc">Domain Z–A</option>
-        <option value="ip:asc">IP address</option>
-        <option value="country:asc">Country</option>
-        <option value="status:asc">HTTP status</option>
-        <option value="tls:asc">Certificate days left</option>
-      </select>
-    </div>
+    <div class="sort-tools">
+      <div class="knob">
+        <label for="sort">Order</label>
+        <select id="sort" class="field">
+          <option value="time:desc" selected>Newest scan first</option>
+          <option value="time:asc">Oldest scan first</option>
+          <option value="domain:asc">Domain A–Z</option>
+          <option value="domain:desc">Domain Z–A</option>
+          <option value="ip:asc">IP address</option>
+          <option value="country:asc">Country</option>
+          <option value="status:asc">HTTP status</option>
+          <option value="tls:asc">Certificate days left</option>
+        </select>
+      </div>
 
-    <div class="knob">
-      <label for="filter">Filter these results</label>
-      <input type="search" id="filter" class="field" spellcheck="false" placeholder="domain, IP, ASN…">
-    </div>
+      <div class="knob">
+        <label for="filter">Filter these results</label>
+        <input type="search" id="filter" class="field" spellcheck="false" placeholder="domain, IP, ASN…">
+      </div>
 
     <div class="knob knob--density">
       <span class="knob__label" id="density-label">Frames per row</span>
@@ -99,13 +112,31 @@
               aria-pressed="false">Hide details</button>
     </div>
 
-    <div class="knob knob--details">
+    <div class="knob knob--details dns-dependent" id="dns-status-control">
       <span class="knob__label">DNS status</span>
       <button type="button" id="toggle-dead" class="btn btn--ghost btn--small"
               aria-pressed="false">Hide dead sites</button>
     </div>
-
-    <button type="button" id="run" class="btn btn--primary">Search</button>
+      <div class="knob knob--export">
+        <span class="knob__label">Export</span>
+        <button type="button" id="toggle-export" class="btn btn--ghost btn--small"
+                aria-expanded="false" aria-controls="export-menu">Export sites</button>
+        <div class="export-menu" id="export-menu" hidden>
+          <fieldset class="dns-dependent" id="export-status-filters">
+            <legend>Include</legend>
+            <label><input type="checkbox" id="export-dead" checked> Dead sites</label>
+            <label><input type="checkbox" id="export-live" checked> Live sites</label>
+          </fieldset>
+          <label class="export-dedupe"><input type="checkbox" id="export-dedupe"> Remove duplicate domains</label>
+          <label class="export-menu__type" for="export-type">File type</label>
+          <select id="export-type" class="field">
+            <option value="txt">.txt</option>
+            <option value="csv">.csv</option>
+          </select>
+          <button type="button" id="export-download" class="btn btn--primary btn--small">Download</button>
+        </div>
+      </div>
+    </div>
   </div>
 </section>
 

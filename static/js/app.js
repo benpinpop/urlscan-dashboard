@@ -20,8 +20,18 @@
     sort: document.getElementById("sort"),
     filter: document.getElementById("filter"),
     collapseDomain: document.getElementById("collapse-domain"),
+    resolveDns: document.getElementById("resolve-dns"),
     toggleDetails: document.getElementById("toggle-details"),
     toggleDead: document.getElementById("toggle-dead"),
+    dnsStatusControl: document.getElementById("dns-status-control"),
+      toggleExport: document.getElementById("toggle-export"),
+      exportMenu: document.getElementById("export-menu"),
+      exportDead: document.getElementById("export-dead"),
+      exportLive: document.getElementById("export-live"),
+      exportDedupe: document.getElementById("export-dedupe"),
+      exportStatusFilters: document.getElementById("export-status-filters"),
+      exportType: document.getElementById("export-type"),
+      exportDownload: document.getElementById("export-download"),
     run: document.getElementById("run"),
     quota: document.getElementById("quota"),
     sheet: document.getElementById("sheet"),
@@ -51,6 +61,9 @@
     total: null,
     totalExact: true,
     hasMore: false,
+    dnsAvailable: false,
+    searchMs: null,
+    dnsMs: null,
     busy: false,
     lastFocus: null
   };
@@ -77,6 +90,17 @@
     el.run.disabled = busy;
     el.loadMore.disabled = busy;
     el.run.textContent = busy ? "Searching…" : "Search";
+  }
+
+  function syncDnsUi() {
+    var available = state.dnsAvailable;
+    el.dnsStatusControl.hidden = !available;
+    el.exportStatusFilters.hidden = !available;
+    el.toggleDead.hidden = !available;
+    if (!available) {
+      el.toggleDead.setAttribute("aria-pressed", "false");
+      el.toggleDead.textContent = "Hide dead sites";
+    }
   }
 
   function formatTime(iso) {
@@ -216,9 +240,12 @@
     }
 
     domain.textContent = result.domain || "Unknown domain";
-    dnsStatus.textContent = result.dns_status ? "Live" : "Dead";
-    dnsStatus.classList.add(result.dns_status ? "dns-status--live" : "dns-status--dead");
-    dnsStatus.setAttribute("aria-label", result.dns_status ? "Domain is live" : "Domain is dead");
+    dnsStatus.hidden = !state.dnsAvailable;
+    if (state.dnsAvailable) {
+      dnsStatus.textContent = result.dns_status ? "Live" : "Dead";
+      dnsStatus.classList.add(result.dns_status ? "dns-status--live" : "dns-status--dead");
+      dnsStatus.setAttribute("aria-label", result.dns_status ? "Domain is live" : "Domain is dead");
+    }
     if (result.result_url) {
       domain.href = result.result_url;
       domain.title = "Open the urlscan.io report for this scan";
@@ -310,7 +337,7 @@
     var displayResults = el.collapseDomain.checked
       ? collapseToLatest(state.results)
       : state.results;
-    if (el.toggleDead.getAttribute("aria-pressed") === "true") {
+    if (state.dnsAvailable && el.toggleDead.getAttribute("aria-pressed") === "true") {
       displayResults = displayResults.filter(function (result) { return result.dns_status !== false; });
     }
     var ordered = sortResults(displayResults);
@@ -354,6 +381,63 @@
     return s;
   }
 
+    function csvCell(value) {
+      var text = value === null || value === undefined ? "" : String(value);
+      return '"' + text.replace(/"/g, '""') + '"';
+    }
+
+    function exportResults() {
+      var includeDead = !state.dnsAvailable || el.exportDead.checked;
+      var includeLive = !state.dnsAvailable || el.exportLive.checked;
+      if (state.dnsAvailable && !includeDead && !includeLive) {
+        showAlert("Select Dead sites, Live sites, or both before exporting.");
+        return;
+      }
+      if (!state.results.length) {
+        showAlert("Run a search before exporting sites.");
+        return;
+      }
+
+      var results = state.results.slice();
+      if (el.exportDedupe.checked) results = collapseToLatest(results);
+      results = results.filter(function (result) {
+        return result.dns_status ? includeLive : includeDead;
+      });
+
+      if (!results.length) {
+        showAlert("No loaded sites match the selected DNS statuses.");
+        return;
+      }
+
+      var extension = el.exportType.value;
+      var content;
+      if (extension === "csv") {
+        var rows = state.dnsAvailable
+          ? [["Domain", "DNS status", "URLScan IP", "Live IP", "Scanned", "Report URL"]]
+          : [["Domain", "URLScan IP", "Scanned", "Report URL"]];
+        results.forEach(function (result) {
+          rows.push(state.dnsAvailable
+            ? [result.domain || "", result.dns_status ? "Live" : "Dead", result.ip || "", result.live_ip || "", result.time || "", result.result_url || ""]
+            : [result.domain || "", result.ip || "", result.time || "", result.result_url || ""]);
+        });
+        content = rows.map(function (row) { return row.map(csvCell).join(","); }).join("\r\n") + "\r\n";
+      } else {
+        content = results.map(function (result) { return result.domain || "Unknown domain"; }).join("\r\n") + "\r\n";
+      }
+
+      var blob = new Blob([content], { type: extension === "csv" ? "text/csv;charset=utf-8" : "text/plain;charset=utf-8" });
+      var url = URL.createObjectURL(blob);
+      var link = document.createElement("a");
+      link.href = url;
+      link.download = "urlscan-sites." + extension;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      el.exportMenu.hidden = true;
+      el.toggleExport.setAttribute("aria-expanded", "false");
+    }
+
   function updateStatus() {
     if (!state.results.length) {
       el.status.textContent = "Nothing on the sheet yet.";
@@ -380,6 +464,14 @@
       el.status.append(document.createTextNode(totalLabel));
     }
     el.status.append(document.createTextNode("."));
+
+    if (typeof state.searchMs === "number" && state.dnsAvailable && typeof state.dnsMs === "number") {
+      el.status.append(
+        document.createTextNode(" Search took " + fmt(state.searchMs) + " ms; DNS took " + fmt(state.dnsMs) + " ms.")
+      );
+    } else if (typeof state.searchMs === "number") {
+      el.status.append(document.createTextNode(" Search took " + fmt(state.searchMs) + " ms."));
+    }
 
     if (state.results.length >= 2000) {
       el.status.append(document.createTextNode(
@@ -408,7 +500,11 @@
     clearAlert();
     setBusy(true);
 
-    var params = { q: query, size: el.size.value };
+    var params = {
+      q: query,
+      size: el.size.value,
+      resolve_dns: el.resolveDns.checked ? "true" : "false"
+    };
     if (append && state.cursor) params.search_after = state.cursor;
 
     request("/api/search", params)
@@ -430,6 +526,10 @@
         state.totalExact = body.meta.total_is_exact;
         state.hasMore = body.meta.has_more;
         state.cursor = body.meta.next_cursor;
+        state.dnsAvailable = body.meta.dns_enabled === true;
+        state.searchMs = body.meta.search_ms;
+        state.dnsMs = body.meta.dns_ms;
+        syncDnsUi();
 
         render();
 
@@ -544,6 +644,12 @@
     el.toggleDead.textContent = hiding ? "Show dead sites" : "Hide dead sites";
     render();
   });
+  el.toggleExport.addEventListener("click", function () {
+    var opening = el.exportMenu.hidden;
+    el.exportMenu.hidden = !opening;
+    el.toggleExport.setAttribute("aria-expanded", String(opening));
+  });
+  el.exportDownload.addEventListener("click", exportResults);
 
   el.query.addEventListener("keydown", function (event) {
     if (event.key === "Enter") { event.preventDefault(); runSearch(false); }
@@ -596,4 +702,5 @@
   });
 
   loadStoredKey();
+  syncDnsUi();
 })();

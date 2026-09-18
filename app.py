@@ -13,6 +13,7 @@ import pathlib
 import re
 import socket
 import sys
+import time
 from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
 
@@ -86,7 +87,7 @@ API_KEY_SHAPE = re.compile(r"^[A-Za-z0-9._\-]{16,128}$")
 CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 CURSOR_SHAPE = re.compile(r"^[A-Za-z0-9._:\-]+$")
 
-DNS_CACHE: dict[str, bool] = {}
+DNS_CACHE: dict[str, str | None] = {}
 DNS_CACHE_LOCK = Lock()
 
 
@@ -154,12 +155,16 @@ def enforce_rate_limit():
     )
 
 
-def _dns_lookup(domain: str) -> tuple[str, bool]:
+def _dns_lookup(domain: str) -> tuple[str, str | None]:
     try:
-        socket.getaddrinfo(domain, 443, type=socket.SOCK_STREAM)
+        addresses = socket.getaddrinfo(domain, 443, type=socket.SOCK_STREAM)
     except (OSError, UnicodeError):
-        return domain, False
-    return domain, True
+        return domain, None
+
+    for address in addresses:
+        if address and address[4]:
+            return domain, address[4][0]
+    return domain, None
 
 
 def attach_dns_status(results: list[dict]) -> None:
@@ -176,7 +181,8 @@ def attach_dns_status(results: list[dict]) -> None:
                 DNS_CACHE.update(dict(executor.map(_dns_lookup, missing)))
         for result in results:
             domain = (result.get("domain") or "").strip().rstrip(".").lower()
-            result["dns_status"] = DNS_CACHE.get(domain) if domain else False
+            result["live_ip"] = DNS_CACHE.get(domain) if domain else None
+            result["dns_status"] = result["live_ip"] is not None
 
 
 @app.after_request
@@ -307,6 +313,11 @@ def search():
         allowed = ", ".join(str(s) for s in Config.ALLOWED_SIZES)
         return fail(f"Results per page must be one of: {allowed}.", 400, "invalid_size")
 
+    raw_resolve_dns = (request.args.get("resolve_dns", "true") or "").lower()
+    if raw_resolve_dns not in {"true", "false"}:
+        return fail("DNS resolution setting must be true or false.", 400, "invalid_dns_setting")
+    resolve_dns = raw_resolve_dns == "true"
+
     cursor = (request.args.get("search_after") or "").strip()
     if cursor:
         parts = cursor.split(",")
@@ -319,16 +330,22 @@ def search():
     if error:
         return error
 
+    search_started = time.perf_counter()
     try:
         payload = client.search(api_key, query, size, cursor or None)
     except UrlscanError as exc:
         log.info("search rejected upstream: %s (%s)", exc.code, exc.status)
         extra = {"retry_after": exc.retry_after} if exc.retry_after else {}
         return fail(exc.message, exc.status, exc.code, **extra)
+    search_ms = round((time.perf_counter() - search_started) * 1000)
 
     raw_results = payload.get("results") or []
     results = [normalise_result(item, i + 1) for i, item in enumerate(raw_results)]
-    attach_dns_status(results)
+    dns_ms = 0
+    if resolve_dns:
+        dns_started = time.perf_counter()
+        attach_dns_status(results)
+        dns_ms = round((time.perf_counter() - dns_started) * 1000)
 
     total = payload.get("total")
     has_more = bool(payload.get("has_more"))
@@ -344,6 +361,9 @@ def search():
                 "total_is_exact": isinstance(total, int) and total <= 10000,
                 "has_more": has_more,
                 "took_ms": payload.get("took"),
+                "search_ms": search_ms,
+                "dns_ms": dns_ms,
+                "dns_enabled": resolve_dns,
                 "next_cursor": build_cursor(raw_results) if has_more else None,
                 "query": query,
                 "size": size,
