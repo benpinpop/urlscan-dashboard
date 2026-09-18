@@ -84,6 +84,7 @@ All settings are environment variables; `.env` is read automatically if `python-
 | `FORCE_SERVER_KEY` | `false` | Ignore browser-supplied keys and always use `URLSCAN_API_KEY`. |
 | `URLSCAN_BASE_URL` | `https://urlscan.io/api/v1` | Override for testing. |
 | `REQUEST_TIMEOUT` | `30` | Seconds to wait on urlscan.io. |
+| `DNS_CACHE_MAX_ENTRIES` | `10000` | Maximum resolved domains held in each worker's memory. |
 | `RATE_LIMIT_PER_MINUTE` | `30` | Backend limit per client address. |
 | `RATE_LIMIT_PER_HOUR` | `400` | Backend limit per client address. |
 | `TRUST_PROXY` | `false` | Read `X-Forwarded-For` for the client address. |

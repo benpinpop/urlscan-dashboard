@@ -178,7 +178,11 @@ def attach_dns_status(results: list[dict]) -> None:
         missing = [domain for domain in domains if domain not in DNS_CACHE]
         if missing:
             with ThreadPoolExecutor(max_workers=min(32, len(missing))) as executor:
-                DNS_CACHE.update(dict(executor.map(_dns_lookup, missing)))
+                resolved = dict(executor.map(_dns_lookup, missing))
+            for domain, address in resolved.items():
+                while len(DNS_CACHE) >= Config.DNS_CACHE_MAX_ENTRIES:
+                    DNS_CACHE.pop(next(iter(DNS_CACHE)))
+                DNS_CACHE[domain] = address
         for result in results:
             domain = (result.get("domain") or "").strip().rstrip(".").lower()
             result["live_ip"] = DNS_CACHE.get(domain) if domain else None

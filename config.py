@@ -38,6 +38,7 @@ class Config:
     FORCE_SERVER_KEY = _as_bool(os.environ.get("FORCE_SERVER_KEY"), False)
 
     REQUEST_TIMEOUT = _as_int(os.environ.get("REQUEST_TIMEOUT"), 30)
+    DNS_CACHE_MAX_ENTRIES = max(1, _as_int(os.environ.get("DNS_CACHE_MAX_ENTRIES"), 10000))
 
     # --- Abuse controls --------------------------------------------------
     RATE_LIMIT_PER_MINUTE = _as_int(os.environ.get("RATE_LIMIT_PER_MINUTE"), 30)
@@ -62,6 +63,7 @@ class Config:
             "debug": cls.DEBUG,
             "server_key_configured": bool(cls.URLSCAN_API_KEY),
             "force_server_key": cls.FORCE_SERVER_KEY,
+            "dns_cache_max_entries": cls.DNS_CACHE_MAX_ENTRIES,
             "trust_proxy": cls.TRUST_PROXY,
             "rate_limit_per_minute": cls.RATE_LIMIT_PER_MINUTE,
             "rate_limit_per_hour": cls.RATE_LIMIT_PER_HOUR,
