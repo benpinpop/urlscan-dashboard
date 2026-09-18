@@ -21,6 +21,7 @@
     filter: document.getElementById("filter"),
     collapseDomain: document.getElementById("collapse-domain"),
     toggleDetails: document.getElementById("toggle-details"),
+    toggleDead: document.getElementById("toggle-dead"),
     run: document.getElementById("run"),
     quota: document.getElementById("quota"),
     sheet: document.getElementById("sheet"),
@@ -198,6 +199,7 @@
     var shot = node.querySelector(".shot");
     var img = node.querySelector(".shot__img");
     var domain = node.querySelector(".frame__domain");
+    var dnsStatus = node.querySelector(".dns-status");
 
     node.querySelector(".frame__no").textContent = String(result.index).padStart(3, "0");
 
@@ -214,6 +216,9 @@
     }
 
     domain.textContent = result.domain || "Unknown domain";
+    dnsStatus.textContent = result.dns_status ? "Live" : "Dead";
+    dnsStatus.classList.add(result.dns_status ? "dns-status--live" : "dns-status--dead");
+    dnsStatus.setAttribute("aria-label", result.dns_status ? "Domain is live" : "Domain is dead");
     if (result.result_url) {
       domain.href = result.result_url;
       domain.title = "Open the urlscan.io report for this scan";
@@ -305,6 +310,9 @@
     var displayResults = el.collapseDomain.checked
       ? collapseToLatest(state.results)
       : state.results;
+    if (el.toggleDead.getAttribute("aria-pressed") === "true") {
+      displayResults = displayResults.filter(function (result) { return result.dns_status !== false; });
+    }
     var ordered = sortResults(displayResults);
     state.displayedCount = ordered.length;
     var fragment = document.createDocumentFragment();
@@ -529,6 +537,12 @@
     var minimal = el.sheet.classList.toggle("is-minimal");
     el.toggleDetails.textContent = minimal ? "Show details" : "Hide details";
     el.toggleDetails.setAttribute("aria-pressed", String(minimal));
+  });
+  el.toggleDead.addEventListener("click", function () {
+    var hiding = el.toggleDead.getAttribute("aria-pressed") !== "true";
+    el.toggleDead.setAttribute("aria-pressed", String(hiding));
+    el.toggleDead.textContent = hiding ? "Show dead sites" : "Hide dead sites";
+    render();
   });
 
   el.query.addEventListener("keydown", function (event) {

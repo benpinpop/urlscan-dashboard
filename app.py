@@ -11,7 +11,10 @@ from __future__ import annotations
 import logging
 import pathlib
 import re
+import socket
 import sys
+from concurrent.futures import ThreadPoolExecutor
+from threading import Lock
 
 from flask import Flask, jsonify, render_template, request
 from werkzeug.exceptions import HTTPException
@@ -83,6 +86,9 @@ API_KEY_SHAPE = re.compile(r"^[A-Za-z0-9._\-]{16,128}$")
 CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 CURSOR_SHAPE = re.compile(r"^[A-Za-z0-9._:\-]+$")
 
+DNS_CACHE: dict[str, bool] = {}
+DNS_CACHE_LOCK = Lock()
+
 
 # --------------------------------------------------------------------------
 # Request plumbing
@@ -146,6 +152,31 @@ def enforce_rate_limit():
         "local_rate_limited",
         retry_after=retry_after,
     )
+
+
+def _dns_lookup(domain: str) -> tuple[str, bool]:
+    try:
+        socket.getaddrinfo(domain, 443, type=socket.SOCK_STREAM)
+    except (OSError, UnicodeError):
+        return domain, False
+    return domain, True
+
+
+def attach_dns_status(results: list[dict]) -> None:
+    """Resolve each distinct result domain once and annotate every hit."""
+    domains = {
+        result["domain"].strip().rstrip(".").lower()
+        for result in results
+        if result.get("domain")
+    }
+    with DNS_CACHE_LOCK:
+        missing = [domain for domain in domains if domain not in DNS_CACHE]
+        if missing:
+            with ThreadPoolExecutor(max_workers=min(32, len(missing))) as executor:
+                DNS_CACHE.update(dict(executor.map(_dns_lookup, missing)))
+        for result in results:
+            domain = (result.get("domain") or "").strip().rstrip(".").lower()
+            result["dns_status"] = DNS_CACHE.get(domain) if domain else False
 
 
 @app.after_request
@@ -297,6 +328,7 @@ def search():
 
     raw_results = payload.get("results") or []
     results = [normalise_result(item, i + 1) for i, item in enumerate(raw_results)]
+    attach_dns_status(results)
 
     total = payload.get("total")
     has_more = bool(payload.get("has_more"))

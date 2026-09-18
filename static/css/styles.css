@@ -212,7 +212,7 @@ code {
 .knob { flex: 0 1 190px; min-width: 130px; }
 .knob--density { flex: 0 0 auto; }
 .knob--collapse { flex: 0 1 auto; min-width: 190px; }
-.knob--details { flex: 0 0 auto; }
+.knob--details { flex: 0 0 auto; min-width: 0; }
 
 .toggle {
   display: flex;
@@ -224,6 +224,8 @@ code {
   cursor: pointer;
   white-space: nowrap;
 }
+
+.knob--collapse .toggle { min-height: 29px; }
 
 .toggle input {
   appearance: none;
@@ -510,6 +512,25 @@ code {
   overflow-wrap: anywhere;
   line-height: 1.25;
 }
+
+.frame__domain-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dns-status {
+  flex: 0 0 auto;
+  font: 600 10px/1 var(--mono);
+  letter-spacing: 0.02em;
+  padding: 3px 5px;
+  border-radius: 2px;
+  color: #fff;
+}
+
+.dns-status--live { background: var(--ok); }
+.dns-status--dead { background: var(--alert); }
 
 .frame__domain:hover { text-decoration: underline; }
 

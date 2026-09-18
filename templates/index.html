@@ -99,6 +99,12 @@
               aria-pressed="false">Hide details</button>
     </div>
 
+    <div class="knob knob--details">
+      <span class="knob__label">DNS status</span>
+      <button type="button" id="toggle-dead" class="btn btn--ghost btn--small"
+              aria-pressed="false">Hide dead sites</button>
+    </div>
+
     <button type="button" id="run" class="btn btn--primary">Search</button>
   </div>
 </section>
@@ -153,7 +159,10 @@
       <span class="frame__no"></span>
     </div>
     <div class="frame__margin">
-      <a class="frame__domain" target="_blank" rel="noopener noreferrer nofollow"></a>
+      <div class="frame__domain-row">
+        <a class="frame__domain" target="_blank" rel="noopener noreferrer nofollow"></a>
+        <span class="dns-status" aria-label="DNS status"></span>
+      </div>
       <dl class="facts">
         <div class="fact fact--ip"><dt>IP at scan</dt><dd class="mono"></dd></div>
         <div class="fact fact--status"><dt>Status</dt><dd class="mono"></dd></div>
