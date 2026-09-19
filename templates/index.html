@@ -77,6 +77,8 @@
           <option value="time:asc">Oldest scan first</option>
           <option value="domain:asc">Domain A–Z</option>
           <option value="domain:desc">Domain Z–A</option>
+          <option value="domain_age:desc">Oldest domain age</option>
+          <option value="domain_age:asc">Newest domain age</option>
           <option value="ip:asc">IP address</option>
           <option value="country:asc">Country</option>
           <option value="status:asc">HTTP status</option>
@@ -192,7 +194,10 @@
     <div class="frame__margin">
       <div class="frame__domain-row">
         <a class="frame__domain" target="_blank" rel="noopener noreferrer nofollow"></a>
-        <span class="dns-status" aria-label="DNS status"></span>
+        <div class="frame__signals">
+          <span class="domain-age" aria-label="Domain age"></span>
+          <span class="dns-status" aria-label="DNS status"></span>
+        </div>
       </div>
       <dl class="facts">
         <div class="fact fact--ip"><dt>IP at scan</dt><dd class="mono"></dd></div>

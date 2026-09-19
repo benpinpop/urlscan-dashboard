@@ -218,12 +218,39 @@
     return { text: label, cls: days <= 14 ? "flag--warn" : "" };
   }
 
+  function domainAgeText(ageDays) {
+    var age = Number(ageDays);
+    if (!isFinite(age) || age < 0) return "Age unknown";
+
+    var totalHours = Math.floor(age * 24);
+    var days = Math.floor(totalHours / 24);
+    var hours = totalHours % 24;
+    if (days >= 365) {
+      var years = Math.floor(days / 365);
+      var remainingMonths = Math.floor((days % 365) / 30);
+      return years + "y" + (remainingMonths ? " " + remainingMonths + "mo" : "");
+    }
+    if (days >= 30) {
+      var months = Math.floor(days / 30);
+      return months + "mo";
+    }
+    if (days) return days + "d" + (hours ? " " + hours + "h" : "");
+    return hours + "h";
+  }
+
+  function isIpAddress(value) {
+    var text = String(value || "").trim();
+    if (text.indexOf(":") !== -1) return true;
+    return /^(?:\d{1,3}\.){3}\d{1,3}$/.test(text);
+  }
+
   function buildFrame(result) {
     var node = el.tpl.content.firstElementChild.cloneNode(true);
     var shot = node.querySelector(".shot");
     var img = node.querySelector(".shot__img");
     var domain = node.querySelector(".frame__domain");
     var dnsStatus = node.querySelector(".dns-status");
+    var domainAge = node.querySelector(".domain-age");
 
     node.querySelector(".frame__no").textContent = String(result.index).padStart(3, "0");
 
@@ -246,6 +273,9 @@
       dnsStatus.classList.add(result.dns_status ? "dns-status--live" : "dns-status--dead");
       dnsStatus.setAttribute("aria-label", result.dns_status ? "Domain is live" : "Domain is dead");
     }
+    domainAge.hidden = isIpAddress(result.domain);
+    domainAge.textContent = domainAgeText(result.domain_age_days);
+    domainAge.title = "Domain age at the time of the scan";
     if (result.result_url) {
       domain.href = result.result_url;
       domain.title = "Open the urlscan.io report for this scan";
@@ -293,6 +323,12 @@
       ip: function (r) { return ipKey(r.ip); },
       country: function (r) { return (r.country || "zz").toLowerCase(); },
       status: function (r) { return parseInt(r.status, 10) || 0; },
+      domain_age: function (r) {
+        var age = Number(r.domain_age_days);
+        return isFinite(age) && age >= 0
+          ? age
+          : (dir === 1 ? Number.MAX_SAFE_INTEGER : Number.MIN_SAFE_INTEGER);
+      },
       tls: function (r) {
         return r.tls_valid_days === null || r.tls_valid_days === undefined
           ? Number.MAX_SAFE_INTEGER : r.tls_valid_days;
@@ -311,7 +347,7 @@
     var latest = new Map();
 
     list.forEach(function (result) {
-      var domain = (result.domain || "").trim().toLowerCase();
+      var domain = (result.domain || "").trim().toLowerCase().replace(/^www\./, "");
       var key = domain || "__missing_domain_" + result.index;
       var current = latest.get(key);
       var resultTime = result.time ? Date.parse(result.time) || 0 : 0;

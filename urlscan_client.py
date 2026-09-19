@@ -180,6 +180,7 @@ def normalise_result(raw: dict, index: int) -> dict:
         "uuid": uuid,
         "domain": _text(page.get("domain")) or _text(task.get("domain")),
         "apex_domain": _text(page.get("apexDomain")) or _text(task.get("apexDomain")),
+        "domain_age_days": page.get("domainAgeDays"),
         "scanned_url": _text(task.get("url")),
         "ip": _text(page.get("ip")),
         "ptr": _text(page.get("ptr")),

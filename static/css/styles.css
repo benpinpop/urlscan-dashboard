@@ -603,8 +603,17 @@ code {
 .frame__domain-row {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
   gap: 8px;
+}
+
+.frame__domain { flex: 1 1 auto; min-width: 0; }
+
+.frame__signals {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 5px;
 }
 
 .dns-status {
@@ -618,6 +627,17 @@ code {
 
 .dns-status--live { background: var(--ok); }
 .dns-status--dead { background: var(--alert); }
+
+.domain-age {
+  flex: 0 0 auto;
+  font: 600 10px/1 var(--mono);
+  letter-spacing: 0.02em;
+  padding: 3px 5px;
+  border: 1px solid var(--paper-edge);
+  border-radius: 2px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
 
 .frame__domain:hover { text-decoration: underline; }
 
