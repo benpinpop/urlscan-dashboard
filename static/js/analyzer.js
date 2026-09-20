@@ -629,6 +629,18 @@ window.URLScanAnalyzer = (function () {
       });
     }
 
+    var seenHashes = {};
+    files = files.filter(function (file) {
+      var hashes = file.hashes || [];
+      var duplicate = hashes.some(function (hash) {
+        return hash.value && seenHashes[hash.value];
+      });
+      hashes.forEach(function (hash) {
+        if (hash.value) seenHashes[hash.value] = true;
+      });
+      return !duplicate;
+    });
+
     var parts = (el.fileSort.value || "index:asc").split(":");
     var field = parts[0];
     var direction = parts[1] === "desc" ? -1 : 1;
@@ -693,11 +705,11 @@ window.URLScanAnalyzer = (function () {
       body.appendChild(emptyRow);
     }
 
-    files.forEach(function (file) {
+    files.forEach(function (file, rowIndex) {
       var row = document.createElement("tr");
       if (file.failed) row.classList.add("is-failed");
 
-      row.appendChild(node("td", "num", file.index));
+      row.appendChild(node("td", "num", rowIndex + 1));
 
       var nameCell = document.createElement("td");
       var nameButton = node("button", "link-btn", filePath(file));

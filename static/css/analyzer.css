@@ -50,9 +50,8 @@
   flex-wrap: wrap;
   gap: 12px;
   align-items: center;
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 14px 0 12px;
+  margin: 0 calc(var(--gutter) * -1);
+  padding: 14px var(--gutter) 12px;
   background: linear-gradient(180deg, rgba(8, 26, 56, 0.97), rgba(8, 26, 56, 0.88));
   border-bottom: 1px solid var(--a-line);
   backdrop-filter: blur(12px);
