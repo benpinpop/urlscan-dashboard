@@ -1,0 +1,328 @@
+{
+  "_comment": "Hand-built stand-in for a urlscan.io result document. It is deliberately awkward: one request has no response at all, one failed, one is a download with three digests, one has a malformed hash, and the certificate list holds a wildcard entry. Digests are invented.",
+  "task": {
+    "uuid": "0f8e1c4a-2b3d-4e5f-8a9b-1c2d3e4f5a6b",
+    "time": "2026-09-14T09:12:44.123Z",
+    "url": "https://cloudmine-pro.example/invest",
+    "visibility": "public",
+    "method": "api",
+    "source": "api",
+    "tags": ["crypto", "hyip"],
+    "domURL": "https://urlscan.io/dom/0f8e1c4a-2b3d-4e5f-8a9b-1c2d3e4f5a6b/"
+  },
+  "page": {
+    "url": "https://cloudmine-pro.example/invest",
+    "title": "CloudMine Pro — Guaranteed Daily Returns",
+    "domain": "www.cloudmine-pro.example",
+    "apexDomain": "cloudmine-pro.example",
+    "ip": "203.0.113.42",
+    "ptr": "vps-42.hosting.example",
+    "asn": "AS64500",
+    "asnname": "EXAMPLE-ANYCAST, US",
+    "country": "US",
+    "city": "Ashburn",
+    "server": "nginx",
+    "status": 200,
+    "mimeType": "text/html",
+    "tlsValidDays": 62,
+    "tlsAgeDays": 28,
+    "tlsIssuer": "R11",
+    "umbrellaRank": null,
+    "redirected": null
+  },
+  "lists": {
+    "ips": ["203.0.113.42", "198.51.100.7", "192.0.2.19"],
+    "countries": ["US", "DE", "SG"],
+    "domains": [
+      "www.cloudmine-pro.example",
+      "cdn.cloudmine-pro.example",
+      "www.google-analytics.com",
+      "d33v4339jhl8k0.cloudfront.net",
+      "t.me",
+      "js.stripe.com"
+    ],
+    "asns": ["AS64500", "AS15169", "AS16509"],
+    "servers": ["nginx", "gws"],
+    "urls": ["https://cloudmine-pro.example/invest"],
+    "certificates": [
+      {
+        "subjectName": "*.cloudmine-pro.example",
+        "issuer": "R11",
+        "validFrom": 1755000000,
+        "validTo": 1763000000
+      },
+      {
+        "subjectName": "www.google-analytics.com",
+        "issuer": "WR2",
+        "validFrom": 1754000000,
+        "validTo": 1762000000
+      }
+    ]
+  },
+  "stats": {
+    "uniqCountries": 3,
+    "totalLinks": 14,
+    "malicious": 1,
+    "adBlocked": 2,
+    "secureRequests": 5,
+    "securePercentage": 83,
+    "IPv6Percentage": 0,
+    "resourceStats": [
+      { "type": "Document", "count": 1, "size": 48210, "encodedSize": 12004 },
+      { "type": "Script", "count": 3, "size": 180400, "encodedSize": 61220 },
+      { "type": "Image", "count": 2, "size": 90210, "encodedSize": 89900 }
+    ],
+    "domainStats": [
+      {
+        "domain": "www.cloudmine-pro.example",
+        "count": 3,
+        "size": 128610,
+        "encodedSize": 41200,
+        "ips": ["203.0.113.42"],
+        "countries": ["US"],
+        "initiators": ["www.cloudmine-pro.example"],
+        "redirects": 0
+      },
+      {
+        "domain": "www.google-analytics.com",
+        "count": 2,
+        "size": 51200,
+        "encodedSize": 20100,
+        "ips": ["198.51.100.7"],
+        "countries": ["US"],
+        "initiators": ["www.cloudmine-pro.example"],
+        "redirects": 0
+      },
+      {
+        "domain": "d33v4339jhl8k0.cloudfront.net",
+        "count": 1,
+        "size": 90210,
+        "encodedSize": 89900,
+        "ips": ["192.0.2.19"],
+        "countries": ["DE"],
+        "initiators": [],
+        "redirects": 0
+      },
+      {
+        "domain": "js.stripe.com",
+        "count": 1,
+        "size": 0,
+        "encodedSize": 0,
+        "ips": [],
+        "countries": [],
+        "initiators": [],
+        "redirects": 0
+      }
+    ],
+    "ipStats": [
+      {
+        "ip": "203.0.113.42",
+        "requests": 3,
+        "count": 3,
+        "asn": { "asn": "AS64500", "name": "EXAMPLE-ANYCAST", "description": "Example hosting" },
+        "geoip": { "country": "US", "country_name": "United States", "city": "Ashburn" }
+      },
+      {
+        "ip": "198.51.100.7",
+        "requests": 2,
+        "count": 2,
+        "asn": { "asn": "AS15169", "name": "GOOGLE" },
+        "geoip": { "country": "US", "country_name": "United States" }
+      },
+      {
+        "ip": "192.0.2.19",
+        "requests": 1,
+        "count": 1,
+        "asn": { "asn": "AS16509", "name": "AMAZON-02" },
+        "geoip": { "country": "DE", "country_name": "Germany" }
+      }
+    ]
+  },
+  "data": {
+    "requests": [
+      {
+        "request": {
+          "documentURL": "https://cloudmine-pro.example/invest",
+          "type": "Document",
+          "initiator": { "type": "other" },
+          "request": {
+            "url": "https://www.cloudmine-pro.example/invest",
+            "method": "GET",
+            "headers": { "User-Agent": "Mozilla/5.0", "Accept": "text/html" }
+          }
+        },
+        "response": {
+          "size": 48210,
+          "dataLength": 48210,
+          "encodedDataLength": 12004,
+          "hash": "9f2c1b0a8e7d6c5b4a39281706f5e4d3c2b1a09f8e7d6c5b4a3928170615243f",
+          "asn": { "asn": "AS64500", "name": "EXAMPLE-ANYCAST" },
+          "geoip": { "country": "US", "country_name": "United States" },
+          "response": {
+            "url": "https://www.cloudmine-pro.example/invest",
+            "status": 200,
+            "statusText": "OK",
+            "mimeType": "text/html",
+            "protocol": "h2",
+            "remoteIPAddress": "203.0.113.42",
+            "securityState": "secure",
+            "headers": {
+              "content-type": "text/html; charset=utf-8",
+              "server": "nginx",
+              "x-powered-by": "PHP/7.4.33",
+              "set-cookie": "sid=abc123; Path=/; HttpOnly",
+              "cache-control": "no-store"
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "type": "Script",
+          "initiator": { "type": "parser", "url": "https://www.cloudmine-pro.example/invest" },
+          "request": { "url": "https://www.google-analytics.com/analytics.js", "method": "GET", "headers": {} }
+        },
+        "response": {
+          "size": 51200,
+          "encodedDataLength": 20100,
+          "hash": "11223344556677889900aabbccddeeff11223344556677889900aabbccddeeff",
+          "asn": { "asn": "AS15169", "name": "GOOGLE" },
+          "geoip": { "country": "US", "country_name": "United States" },
+          "response": {
+            "url": "https://www.google-analytics.com/analytics.js",
+            "status": 200,
+            "mimeType": "application/javascript",
+            "protocol": "h2",
+            "remoteIPAddress": "198.51.100.7",
+            "headers": { "content-type": "application/javascript", "cache-control": "max-age=7200" }
+          }
+        }
+      },
+      {
+        "request": {
+          "type": "Image",
+          "initiator": { "type": "parser" },
+          "request": { "url": "https://d33v4339jhl8k0.cloudfront.net/assets/hero.png", "method": "GET", "headers": {} }
+        },
+        "response": {
+          "size": 90210,
+          "encodedDataLength": 89900,
+          "hash": "NOT-A-HASH",
+          "geoip": { "country": "DE", "country_name": "Germany" },
+          "asn": { "asn": "AS16509", "name": "AMAZON-02" },
+          "response": {
+            "url": "https://d33v4339jhl8k0.cloudfront.net/assets/hero.png",
+            "status": 200,
+            "mimeType": "image/png",
+            "remoteIPAddress": "192.0.2.19",
+            "headers": { "content-type": "image/png" }
+          }
+        }
+      },
+      {
+        "request": {
+          "type": "Other",
+          "initiator": { "type": "script" },
+          "request": { "url": "https://cdn.cloudmine-pro.example/downloads/Wallet-Setup.exe", "method": "GET", "headers": {} }
+        },
+        "response": {
+          "size": 4210688,
+          "encodedDataLength": 4210688,
+          "hash": "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899",
+          "response": {
+            "url": "https://cdn.cloudmine-pro.example/downloads/Wallet-Setup.exe",
+            "status": 200,
+            "mimeType": "application/octet-stream",
+            "remoteIPAddress": "203.0.113.42",
+            "headers": {
+              "content-type": "application/octet-stream",
+              "content-disposition": "attachment; filename=\"Wallet-Setup.exe\"",
+              "content-length": "4210688"
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "type": "Script",
+          "initiator": { "type": "script" },
+          "request": { "url": "https://js.stripe.com/v3/", "method": "GET", "headers": {} }
+        },
+        "response": { "failed": { "errorText": "net::ERR_BLOCKED_BY_CLIENT" } }
+      },
+      {
+        "request": {
+          "type": "Document",
+          "initiator": { "type": "other" },
+          "request": { "url": "https://t.me/cloudminepro_support", "method": "GET", "headers": {} }
+        }
+      }
+    ],
+    "cookies": [{ "name": "sid", "domain": ".cloudmine-pro.example" }],
+    "console": [{ "message": { "text": "web3 provider not found" } }],
+    "links": [
+      { "href": "https://t.me/cloudminepro_support", "text": "Telegram support" },
+      { "href": "https://cloudmine-pro.example/terms", "text": "Terms" }
+    ],
+    "globals": [{ "prop": "ethereum", "type": "object" }]
+  },
+  "meta": {
+    "processors": {
+      "wappa": {
+        "data": [
+          { "app": "Nginx", "confidence": 100, "categories": [{ "name": "Web servers" }] },
+          { "app": "jQuery", "confidence": 100, "categories": [{ "name": "JavaScript libraries" }] }
+        ]
+      },
+      "download": {
+        "data": [
+          {
+            "filename": "Wallet-Setup.exe",
+            "mimeType": "application/octet-stream",
+            "fileSize": 4210688,
+            "sha256": "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899",
+            "sha1": "da39a3ee5e6b4b0d3255bfef95601890afd80709",
+            "md5": "d41d8cd98f00b204e9800998ecf8427e"
+          }
+        ]
+      }
+    }
+  },
+  "verdicts": {
+    "overall": {
+      "score": 85,
+      "malicious": true,
+      "categories": ["scam", "financial"],
+      "brands": [],
+      "tags": ["hyip"],
+      "hasVerdicts": 2
+    },
+    "urlscan": {
+      "score": 75,
+      "malicious": true,
+      "categories": ["scam"],
+      "tags": ["crypto-investment"],
+      "brands": [],
+      "detectionDetails": ["Page promises fixed daily returns", "Telegram-only support channel"]
+    },
+    "engines": {
+      "score": 66,
+      "maliciousTotal": 2,
+      "benignTotal": 1,
+      "enginesTotal": 3,
+      "malicious": ["ExampleEngineC"],
+      "benign": [],
+      "verdicts": [
+        { "engine": "ExampleEngineA", "malicious": true, "score": 100, "categories": ["phishing"] },
+        { "engine": "ExampleEngineB", "malicious": false, "score": 0, "categories": [] }
+      ]
+    },
+    "community": {
+      "score": 0,
+      "malicious": false,
+      "votesTotal": 2,
+      "votesMalicious": 2,
+      "votesBenign": 0
+    }
+  }
+}

@@ -658,6 +658,22 @@ code {
   overflow-wrap: anywhere;
 }
 
+.frame__analyze {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  background: linear-gradient(120deg, #1266c3, #328de1 62%, #36cabb);
+  border-color: #4caee7;
+  color: #fff;
+  text-align: center;
+  box-shadow: 0 4px 10px rgba(17, 105, 194, 0.2);
+}
+
+.frame__analyze:hover {
+  background: linear-gradient(120deg, #0f59ac, #267ed0 62%, #27b6a7);
+  color: #fff;
+}
+
 .flag--bad  { color: var(--alert); font-weight: 600; }
 .flag--warn { color: var(--warn);  font-weight: 600; }
 .flag--ok   { color: var(--ok); }

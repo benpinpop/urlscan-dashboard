@@ -6,6 +6,7 @@
 <meta name="referrer" content="no-referrer">
 <title>Query Visualizer</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/analyzer.css') }}">
 <link rel="icon" href="data:,">
 </head>
 <body>
@@ -145,6 +146,7 @@
 <div class="status" id="status" role="status" aria-live="polite">
   <p class="status__line" id="status-line">Nothing on the sheet yet.</p>
   <button type="button" id="quota" class="btn btn--ghost btn--small">Check quota</button>
+  <button type="button" id="open-analyzer" class="btn btn--ghost btn--small">Open result analyzer</button>
 </div>
 
 <div class="alert" id="alert" role="alert" hidden>
@@ -199,6 +201,7 @@
           <span class="dns-status" aria-label="DNS status"></span>
         </div>
       </div>
+      <button type="button" class="btn btn--ghost btn--small frame__analyze">Analyze result</button>
       <dl class="facts">
         <div class="fact fact--ip"><dt>IP at scan</dt><dd class="mono"></dd></div>
         <div class="fact fact--status"><dt>Status</dt><dd class="mono"></dd></div>
@@ -209,7 +212,58 @@
   </article>
 </template>
 
+<!-- Result analyzer. Everything inside is built by static/js/analyzer.js; the
+     markup here is only the shell, so the panel has no server-rendered data in it. -->
+<section class="analyzer" id="analyzer" hidden aria-label="Scan result analyzer">
+  <div class="analyzer__bar">
+    <button type="button" id="an-back" class="btn btn--ghost btn--small">&larr; Back to search</button>
+
+    <div class="analyzer__uuid">
+      <label class="sr-only" for="an-uuid">urlscan.io scan ID</label>
+      <input type="text" id="an-uuid" class="field" spellcheck="false" autocomplete="off"
+             placeholder="Scan ID, e.g. 01234567-89ab-cdef-0123-456789abcdef">
+      <button type="button" id="an-pull" class="btn btn--primary btn--small">Pull result from URLScan</button>
+    </div>
+
+    <span id="an-verdict-chip"></span>
+    <a id="an-report" class="btn btn--ghost btn--small" target="_blank"
+       rel="noopener noreferrer" hidden>urlscan.io report</a>
+  </div>
+
+  <div class="loading" id="an-loading" hidden>
+    <div class="loading__bar"><span></span></div>
+    <p id="an-loading-label">Reading the scan&hellip;</p>
+  </div>
+
+  <div class="alert" id="an-alert" role="alert" hidden>
+    <p class="alert__msg" id="an-alert-msg"></p>
+    <button type="button" class="alert__close" id="an-alert-close" aria-label="Dismiss">&times;</button>
+  </div>
+
+  <div class="analyzer__title" id="an-title" hidden>
+    <h2 id="an-page-title"></h2>
+    <p id="an-page-url"></p>
+  </div>
+
+  <div class="analyzer__intro" id="an-intro">
+    <p>Paste a urlscan.io scan ID above and pull the result, or open one from a frame on the contact sheet.</p>
+  </div>
+
+  <div class="analyzer__body" id="an-body" hidden></div>
+</section>
+
+<div class="panel" id="an-panel" hidden>
+  <div class="panel__inner" role="dialog" aria-modal="true" aria-labelledby="an-panel-title">
+    <div class="panel__bar">
+      <h3 id="an-panel-title"></h3>
+      <button type="button" id="an-panel-close" class="btn btn--ghost btn--small">Close</button>
+    </div>
+    <div id="an-panel-body"></div>
+  </div>
+</div>
+
 <script src="{{ url_for('static', filename='js/examples.js') }}"></script>
+<script src="{{ url_for('static', filename='js/analyzer.js') }}" defer></script>
 <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
 </body>
 </html>

@@ -1,0 +1,196 @@
+pattern,category,label
+google-analytics.com,analytics,Google Analytics
+googletagmanager.com,analytics,Google Tag Manager
+analytics.google.com,analytics,Google Analytics
+stats.g.doubleclick.net,analytics,Google Analytics
+translate.google.com,analytics,Google Translate
+segment.com,analytics,Segment
+segment.io,analytics,Segment
+cdn.segment.com,analytics,Segment
+mixpanel.com,analytics,Mixpanel
+amplitude.com,analytics,Amplitude
+hotjar.com,analytics,Hotjar
+hotjar.io,analytics,Hotjar
+matomo.cloud,analytics,Matomo
+plausible.io,analytics,Plausible
+statcounter.com,analytics,StatCounter
+mc.yandex.ru,analytics,Yandex Metrica
+yandex.ru,analytics,Yandex
+clarity.ms,analytics,Microsoft Clarity
+newrelic.com,analytics,New Relic
+nr-data.net,analytics,New Relic
+sentry.io,analytics,Sentry
+cloudflareinsights.com,analytics,Cloudflare Insights
+mouseflow.com,analytics,Mouseflow
+luckyorange.com,analytics,Lucky Orange
+crazyegg.com,analytics,Crazy Egg
+fullstory.com,analytics,FullStory
+heap.io,analytics,Heap
+quantserve.com,analytics,Quantcast
+scorecardresearch.com,tracker,Comscore
+doubleclick.net,ads,Google Ads
+googlesyndication.com,ads,Google AdSense
+googleadservices.com,ads,Google Ads
+adnxs.com,ads,Xandr
+criteo.com,ads,Criteo
+criteo.net,ads,Criteo
+taboola.com,ads,Taboola
+outbrain.com,ads,Outbrain
+pubmatic.com,ads,PubMatic
+rubiconproject.com,ads,Magnite
+openx.net,ads,OpenX
+adsrvr.org,ads,The Trade Desk
+bidswitch.net,ads,BidSwitch
+casalemedia.com,ads,Index Exchange
+smartadserver.com,ads,Equativ
+teads.tv,ads,Teads
+sharethrough.com,ads,Sharethrough
+moatads.com,ads,Moat
+adform.net,ads,Adform
+adroll.com,ads,AdRoll
+media.net,ads,Media.net
+propellerads.com,ads,PropellerAds
+popads.net,ads,PopAds
+revcontent.com,ads,RevContent
+mgid.com,ads,MGID
+adsterra.com,ads,Adsterra
+onclickads.net,ads,Onclickads
+connect.facebook.net,tracker,Meta Pixel
+facebook.com,social,Facebook
+fbcdn.net,cdn,Meta CDN
+bat.bing.com,tracker,Microsoft Ads
+analytics.tiktok.com,tracker,TikTok Pixel
+tr.snapchat.com,tracker,Snap Pixel
+ads.linkedin.com,tracker,LinkedIn Insight
+px.ads.linkedin.com,tracker,LinkedIn Insight
+hubspot.com,tracker,HubSpot
+hs-scripts.com,tracker,HubSpot
+hsforms.net,tracker,HubSpot
+klaviyo.com,tracker,Klaviyo
+braze.com,tracker,Braze
+onesignal.com,tracker,OneSignal
+pushengage.com,tracker,PushEngage
+cloudflare.com,cdn,Cloudflare
+cdnjs.cloudflare.com,cdn,cdnjs
+jsdelivr.net,cdn,jsDelivr
+unpkg.com,cdn,unpkg
+akamai.net,cdn,Akamai
+akamaihd.net,cdn,Akamai
+akamaized.net,cdn,Akamai
+edgesuite.net,cdn,Akamai
+fastly.net,cdn,Fastly
+fastlylb.net,cdn,Fastly
+cloudfront.net,cdn,CloudFront
+bootstrapcdn.com,cdn,BootstrapCDN
+stackpathdns.com,cdn,StackPath
+azureedge.net,cdn,Azure CDN
+gstatic.com,cdn,Google Static
+googleapis.com,cdn,Google APIs
+googleusercontent.com,cdn,Google User Content
+cdn77.org,cdn,CDN77
+kxcdn.com,cdn,KeyCDN
+bunny.net,cdn,Bunny CDN
+b-cdn.net,cdn,Bunny CDN
+jquery.com,cdn,jQuery CDN
+typekit.net,fonts,Adobe Fonts
+fonts.googleapis.com,fonts,Google Fonts
+fonts.gstatic.com,fonts,Google Fonts
+fontawesome.com,fonts,Font Awesome
+use.fontawesome.com,fonts,Font Awesome
+google.com/recaptcha,captcha,reCAPTCHA
+recaptcha.net,captcha,reCAPTCHA
+gstatic.com/recaptcha,captcha,reCAPTCHA
+hcaptcha.com,captcha,hCaptcha
+challenges.cloudflare.com,captcha,Cloudflare Turnstile
+arkoselabs.com,captcha,Arkose Labs
+twitter.com,social,Twitter
+x.com,social,X
+t.me,social,Telegram
+telegram.org,social,Telegram
+telegram.me,social,Telegram
+instagram.com,social,Instagram
+linkedin.com,social,LinkedIn
+youtube.com,social,YouTube
+ytimg.com,social,YouTube
+vk.com,social,VK
+whatsapp.com,social,WhatsApp
+wa.me,social,WhatsApp
+discord.com,social,Discord
+discord.gg,social,Discord
+reddit.com,social,Reddit
+tawk.to,chat,Tawk.to
+livechatinc.com,chat,LiveChat
+crisp.chat,chat,Crisp
+zendesk.com,chat,Zendesk
+zdassets.com,chat,Zendesk
+intercom.io,chat,Intercom
+intercomcdn.com,chat,Intercom
+jivosite.com,chat,JivoSite
+tidio.co,chat,Tidio
+smartsuppchat.com,chat,Smartsuppchat
+smartsuppcdn.com,chat,Smartsuppchat
+smartsupp.com,chat,Smartsuppchat
+btcwidget.info,crypto,BTC Widget
+chatra.io,chat,Chatra
+stripe.com,payment,Stripe
+js.stripe.com,payment,Stripe
+paypal.com,payment,PayPal
+paypalobjects.com,payment,PayPal
+checkout.com,payment,Checkout.com
+braintreegateway.com,payment,Braintree
+squareup.com,payment,Square
+coinbase.com,crypto,Coinbase
+commerce.coinbase.com,crypto,Coinbase Commerce
+binance.com,crypto,Binance
+walletconnect.com,crypto,WalletConnect
+walletconnect.org,crypto,WalletConnect
+infura.io,crypto,Infura
+alchemy.com,crypto,Alchemy
+alchemyapi.io,crypto,Alchemy
+etherscan.io,crypto,Etherscan
+bscscan.com,crypto,BscScan
+tronscan.org,crypto,Tronscan
+trongrid.io,crypto,TronGrid
+web3modal.com,crypto,Web3Modal
+coingecko.com,crypto,CoinGecko
+tradingview.com,crypto,TradingView
+coinlib.io,crypto,Coinlib
+tradingview-widget.com,crypto,TradingView
+bybit.com,crypto,Bybit
+binance.com,crypto,Binance
+investing.com,crypto,Investing.com
+coinmarketcap.com,crypto,CoinMarketCap
+cryptocompare.com,crypto,CryptoCompare
+tronlink.org,crypto,TronLink
+metamask.io,crypto,MetaMask
+nowpayments.io,crypto,NOWPayments
+coinpayments.net,crypto,CoinPayments
+wordpress.org,platform,WordPress
+wp.com,platform,WordPress.com
+w.org,platform,WordPress
+shopify.com,platform,Shopify
+shopifycdn.com,platform,Shopify
+wixstatic.com,platform,Wix
+parastorage.com,platform,Wix
+squarespace.com,platform,Squarespace
+sqspcdn.com,platform,Squarespace
+webflow.com,platform,Webflow
+github.io,hosting,GitHub Pages
+githubusercontent.com,hosting,GitHub
+vercel.app,hosting,Vercel
+netlify.app,hosting,Netlify
+pages.dev,hosting,Cloudflare Pages
+workers.dev,hosting,Cloudflare Workers
+firebaseio.com,hosting,Firebase
+firebaseapp.com,hosting,Firebase
+amazonaws.com,hosting,AWS
+digitaloceanspaces.com,hosting,DigitalOcean
+blob.core.windows.net,hosting,Azure Blob
+oss-cn-hangzhou.aliyuncs.com,hosting,Alibaba OSS
+aliyuncs.com,hosting,Alibaba Cloud
+weebly.com,platform,Weebly
+ngrok.io,hosting,ngrok
+ngrok-free.app,hosting,ngrok
+trycloudflare.com,hosting,Cloudflare Tunnel
+duckdns.org,hosting,Dynamic DNS
+no-ip.com,hosting,Dynamic DNS

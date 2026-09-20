@@ -50,7 +50,8 @@
     lightboxFacts: document.getElementById("lightbox-facts"),
     lightboxClose: document.getElementById("lightbox-close"),
     tpl: document.getElementById("frame-tpl"),
-    exampleList: document.getElementById("example-list")
+    exampleList: document.getElementById("example-list"),
+    openAnalyzer: document.getElementById("open-analyzer")
   };
 
   var state = {
@@ -303,6 +304,17 @@
     if (tls.cls) tlsEl.classList.add(tls.cls);
 
     node.querySelector(".fact--time dd").textContent = formatTime(result.time);
+
+    var analyze = node.querySelector(".frame__analyze");
+    if (result.uuid && window.URLScanAnalyzer) {
+      analyze.title = "Open this scan in the result analyzer";
+      analyze.addEventListener("click", function () {
+        window.URLScanAnalyzer.open(result.uuid);
+      });
+    } else {
+      /* No scan ID means there is nothing for the analyzer to pull. */
+      analyze.hidden = true;
+    }
 
     node.dataset.haystack = [
       result.domain, result.ip, result.asn, result.asn_name,
@@ -736,6 +748,34 @@
   document.addEventListener("keydown", function (event) {
     if (event.key === "Escape" && !el.lightbox.hidden) closeLightbox();
   });
+
+  /* ------------------------------------------------------------ analyzer */
+
+  /* The analyzer is a separate module on the same page. It gets the key through
+   * a callback rather than reading the field itself, and it hands pivots back
+   * here so a domain or hash click lands in this grid. */
+  if (window.URLScanAnalyzer) {
+    window.URLScanAnalyzer.init({
+      getKey: currentKey,
+      onPivot: function (query) {
+        window.URLScanAnalyzer.close();
+        el.query.value = query;
+        el.filter.value = "";
+        runSearch(false);
+      }
+    });
+
+    el.openAnalyzer.addEventListener("click", function () {
+      window.URLScanAnalyzer.open(null);
+    });
+
+    /* Cached results are scoped to one key. Switching keys must not leave
+     * another account's scans readable from this tab. */
+    el.key.addEventListener("change", function () { window.URLScanAnalyzer.clearCache(); });
+    el.keyForget.addEventListener("click", function () { window.URLScanAnalyzer.clearCache(); });
+  } else if (el.openAnalyzer) {
+    el.openAnalyzer.hidden = true;
+  }
 
   loadStoredKey();
   syncDnsUi();

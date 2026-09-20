@@ -42,9 +42,23 @@ class UrlscanNetworkError(UrlscanError):
     code = "network_error"
 
 
+class UrlscanNotFoundError(UrlscanError):
+    status = 404
+    code = "not_found"
+
+
+class UrlscanTooLargeError(UrlscanError):
+    status = 413
+    code = "response_too_large"
+
+
 class UrlscanClient:
-    def __init__(self, base_url: str, timeout: int = 30):
+    def __init__(self, base_url: str, timeout: int = 30, site_url: str = "https://urlscan.io"):
         self.base_url = base_url.rstrip("/")
+        # The DOM and screenshot live on the site itself, not under /api/v1.
+        # It is configured separately so nothing is derived from a field in an
+        # API response, which would let the upstream document choose our host.
+        self.site_url = site_url.rstrip("/")
         self.timeout = timeout
         self._session = requests.Session()
         self._session.headers.update(
@@ -71,6 +85,54 @@ class UrlscanClient:
             raise UrlscanNetworkError("Could not reach urlscan.io.") from exc
 
         return self._interpret(response)
+
+    def _get_text(self, url: str, api_key: str, max_bytes: int) -> str:
+        """Stream a text document, refusing anything over ``max_bytes``.
+
+        Used for the DOM, which is arbitrary-size attacker-controlled content:
+        without a ceiling a single scan of a huge page could exhaust memory.
+        """
+        try:
+            with self._session.get(
+                url,
+                headers={"API-Key": api_key, "Accept": "text/html, text/plain, */*"},
+                timeout=self.timeout,
+                stream=True,
+            ) as response:
+                if response.status_code == 404:
+                    raise UrlscanNotFoundError(
+                        "urlscan.io has no stored DOM for this scan. Very old scans and "
+                        "some private scans do not keep one."
+                    )
+                if not response.ok:
+                    self._interpret(response)  # raises with the right subclass
+
+                declared = response.headers.get("Content-Length")
+                if declared and declared.isdigit() and int(declared) > max_bytes:
+                    raise UrlscanTooLargeError(
+                        f"The stored DOM is {int(declared) // 1024} KB, over this server's "
+                        f"{max_bytes // 1024} KB limit for content analysis."
+                    )
+
+                chunks: list[bytes] = []
+                total = 0
+                for chunk in response.iter_content(chunk_size=65536):
+                    if not chunk:
+                        continue
+                    total += len(chunk)
+                    if total > max_bytes:
+                        raise UrlscanTooLargeError(
+                            f"The stored DOM is larger than this server's "
+                            f"{max_bytes // 1024} KB limit for content analysis."
+                        )
+                    chunks.append(chunk)
+
+                encoding = response.encoding or response.apparent_encoding or "utf-8"
+                return b"".join(chunks).decode(encoding, errors="replace")
+        except requests.exceptions.Timeout as exc:
+            raise UrlscanNetworkError("urlscan.io did not respond in time.") from exc
+        except requests.exceptions.RequestException as exc:
+            raise UrlscanNetworkError("Could not reach urlscan.io.") from exc
 
     @staticmethod
     def _interpret(response: requests.Response) -> dict:
@@ -110,6 +172,15 @@ class UrlscanClient:
                 "response. Check any egress proxy or firewall between this server and urlscan.io."
             )
 
+        if response.status_code == 404:
+            # urlscan answers 404 both for "no such scan" and for a scan that
+            # has not finished processing yet; its own message distinguishes
+            # them, so pass it through when there is one.
+            raise UrlscanNotFoundError(
+                detail or "urlscan.io has no result for that scan ID. It may still be "
+                "processing, or the scan may be private to another account."
+            )
+
         if response.status_code == 400:
             raise UrlscanQueryError(
                 detail or "urlscan.io could not parse that query. Check the field names and syntax."
@@ -139,6 +210,14 @@ class UrlscanClient:
 
     def quotas(self, api_key: str) -> dict:
         return self._get("/quotas/", api_key)
+
+    def result(self, api_key: str, uuid: str) -> dict:
+        """Full scan result. ``uuid`` must already be validated by the caller."""
+        return self._get(f"/result/{uuid}/", api_key)
+
+    def dom(self, api_key: str, uuid: str, max_bytes: int = 4 * 1024 * 1024) -> str:
+        """Stored DOM for a scan, as text."""
+        return self._get_text(f"{self.site_url}/dom/{uuid}/", api_key, max_bytes)
 
 
 # -- response shaping -----------------------------------------------------

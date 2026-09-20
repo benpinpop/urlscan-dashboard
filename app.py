@@ -8,6 +8,7 @@ to disk or to a log line.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import pathlib
 import re
@@ -28,7 +29,10 @@ except ImportError:  # pragma: no cover
     pass
 
 from config import Config
+from domain_intel import DomainTable
+from keyword_db import KeywordDatabase, band_for, extract_text
 from rate_limit import RateLimiter
+from result_shaper import shape_result
 from urlscan_client import (
     UrlscanClient,
     UrlscanError,
@@ -72,10 +76,40 @@ app = Flask(__name__)
 app.config["JSON_SORT_KEYS"] = False
 app.config["MAX_CONTENT_LENGTH"] = 64 * 1024
 
-client = UrlscanClient(Config.URLSCAN_BASE_URL, timeout=Config.REQUEST_TIMEOUT)
+client = UrlscanClient(
+    Config.URLSCAN_BASE_URL,
+    timeout=Config.REQUEST_TIMEOUT,
+    site_url=Config.URLSCAN_SITE_URL,
+)
 limiter = RateLimiter(
     per_minute=Config.RATE_LIMIT_PER_MINUTE,
     per_hour=Config.RATE_LIMIT_PER_HOUR,
+)
+analyze_limiter = RateLimiter(
+    per_minute=Config.ANALYZE_LIMIT_PER_MINUTE,
+    per_hour=Config.ANALYZE_LIMIT_PER_HOUR,
+)
+
+# Both tables are read once at import. A missing or broken keyword file must not
+# take the search dashboard down with it, so the analyzer degrades instead: the
+# content-analysis endpoint reports why it is unavailable and everything else
+# keeps working.
+KEYWORD_DB: KeywordDatabase | None = None
+KEYWORD_DB_ERROR: str | None = None
+try:
+    KEYWORD_DB = (
+        KeywordDatabase.load(Config.KEYWORD_DB_PATH)
+        if Config.KEYWORD_DB_PATH
+        else KeywordDatabase.load()
+    )
+except Exception as exc:  # pragma: no cover - configuration problem
+    KEYWORD_DB_ERROR = f"{type(exc).__name__}: {exc}"
+    log.error("risk keyword database unavailable: %s", KEYWORD_DB_ERROR)
+
+DOMAIN_TABLE = (
+    DomainTable.load(Config.DOMAIN_TABLE_PATH)
+    if Config.DOMAIN_TABLE_PATH
+    else DomainTable.load()
 )
 
 # urlscan keys are UUIDs, but accept anything key-shaped so a future format
@@ -89,6 +123,58 @@ CURSOR_SHAPE = re.compile(r"^[A-Za-z0-9._:\-]+$")
 
 DNS_CACHE: dict[str, str | None] = {}
 DNS_CACHE_LOCK = Lock()
+
+# urlscan scan IDs are v4 UUIDs. Validating the shape here means the value can
+# never reach the upstream path as anything but 36 hex-and-dash characters.
+UUID_SHAPE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE
+)
+
+RESULT_CACHE: dict[str, tuple[float, dict]] = {}
+RESULT_CACHE_LOCK = Lock()
+
+
+def cache_key(uuid: str, api_key: str) -> str:
+    """Scope cached results to the key that fetched them.
+
+    A private scan is visible to one account, so two analysts sharing this
+    server must not be able to read each other's results out of the cache. The
+    key itself is never stored: only a truncated digest of it.
+    """
+    digest = hashlib.sha256(api_key.encode("utf-8")).hexdigest()[:16]
+    return f"{uuid.lower()}:{digest}"
+
+
+def cache_get(key: str) -> dict | None:
+    if Config.RESULT_CACHE_TTL <= 0:
+        return None
+    now = time.monotonic()
+    with RESULT_CACHE_LOCK:
+        entry = RESULT_CACHE.get(key)
+        if not entry:
+            return None
+        stored_at, document = entry
+        if now - stored_at > Config.RESULT_CACHE_TTL:
+            RESULT_CACHE.pop(key, None)
+            return None
+        return document
+
+
+def cache_put(key: str, document: dict) -> None:
+    if Config.RESULT_CACHE_TTL <= 0:
+        return
+    with RESULT_CACHE_LOCK:
+        now = time.monotonic()
+        stale = [
+            existing
+            for existing, (stored_at, _) in RESULT_CACHE.items()
+            if now - stored_at > Config.RESULT_CACHE_TTL
+        ]
+        for existing in stale:
+            RESULT_CACHE.pop(existing, None)
+        while len(RESULT_CACHE) >= Config.RESULT_CACHE_MAX_ENTRIES:
+            RESULT_CACHE.pop(next(iter(RESULT_CACHE)), None)
+        RESULT_CACHE[key] = (now, document)
 
 
 # --------------------------------------------------------------------------
@@ -215,7 +301,13 @@ def security_headers(response):
 # --------------------------------------------------------------------------
 
 
-REQUIRED_ASSETS = ("templates/index.html", "static/css/styles.css", "static/js/app.js")
+REQUIRED_ASSETS = (
+    "templates/index.html",
+    "static/css/styles.css",
+    "static/css/analyzer.css",
+    "static/js/app.js",
+    "static/js/analyzer.js",
+)
 
 
 def missing_assets() -> list[str]:
@@ -239,13 +331,17 @@ exactly this:</p>
 <pre style="background:#f4f4f4;padding:12px;overflow:auto">app.py
 templates/index.html
 static/css/styles.css
-static/js/app.js</pre>
+static/css/analyzer.css
+static/js/app.js
+static/js/analyzer.js</pre>
 <p>If the files were downloaded individually they are probably sitting flat next to
 <code>app.py</code>. Put them back:</p>
 <pre style="background:#f4f4f4;padding:12px;overflow:auto">mkdir -p templates static/css static/js
-mv index.html  templates/
-mv styles.css  static/css/
-mv app.js      static/js/</pre>
+mv index.html    templates/
+mv styles.css    static/css/
+mv analyzer.css  static/css/
+mv app.js        static/js/
+mv analyzer.js   static/js/</pre>
 <p><code>app.js</code> and <code>app.py</code> are different files — do not overwrite one with
 the other. Then restart the service.</p>
 </body></html>"""
@@ -286,6 +382,13 @@ def runtime_config():
             "server_key_configured": bool(Config.URLSCAN_API_KEY),
             "force_server_key": Config.FORCE_SERVER_KEY,
             "max_query_length": Config.MAX_QUERY_LENGTH,
+            "analyzer": {
+                "content_analysis_available": KEYWORD_DB is not None,
+                "keyword_count": KEYWORD_DB.summary()["keyword_count"] if KEYWORD_DB else 0,
+                "category_count": KEYWORD_DB.summary()["category_count"] if KEYWORD_DB else 0,
+                "domain_patterns": DOMAIN_TABLE.size,
+                "max_dom_kb": Config.MAX_DOM_BYTES // 1024,
+            },
         }
     )
 
@@ -374,6 +477,192 @@ def search():
             },
         }
     )
+
+
+# --------------------------------------------------------------------------
+# Result analyzer
+# --------------------------------------------------------------------------
+
+
+def fetch_result(uuid: str, api_key: str) -> tuple[dict | None, tuple | None, bool]:
+    """Raw result document for a scan, from cache when it is still warm.
+
+    Returns ``(document, error_response, cached)``.
+    """
+    key = cache_key(uuid, api_key)
+    cached = cache_get(key)
+    if cached is not None:
+        return cached, None, True
+
+    try:
+        document = client.result(api_key, uuid)
+    except UrlscanError as exc:
+        log.info("result rejected upstream: %s (%s)", exc.code, exc.status)
+        extra = {"retry_after": exc.retry_after} if exc.retry_after else {}
+        return None, fail(exc.message, exc.status, exc.code, **extra), False
+
+    if not isinstance(document, dict) or not document:
+        return None, fail(
+            "urlscan.io returned a result this server could not read.",
+            502,
+            "malformed_result",
+        ), False
+
+    cache_put(key, document)
+    return document, None, False
+
+
+def validate_uuid(uuid: str) -> tuple | None:
+    if not UUID_SHAPE.match(uuid or ""):
+        return fail(
+            "That is not a urlscan.io scan ID. It looks like "
+            "01234567-89ab-cdef-0123-456789abcdef.",
+            400,
+            "invalid_uuid",
+        )
+    return None
+
+
+@app.route("/api/result/<uuid>")
+def result(uuid: str):
+    limited = enforce_rate_limit()
+    if limited:
+        return limited
+
+    invalid = validate_uuid(uuid)
+    if invalid:
+        return invalid
+
+    api_key, error = resolve_api_key()
+    if error:
+        return error
+
+    started = time.perf_counter()
+    document, error, cached = fetch_result(uuid, api_key)
+    if error:
+        return error
+
+    payload = shape_result(document, DOMAIN_TABLE)
+    payload["ok"] = True
+    payload["meta"] = {
+        "uuid": uuid.lower(),
+        "cached": cached,
+        "fetch_ms": round((time.perf_counter() - started) * 1000),
+        "content_analysis_available": KEYWORD_DB is not None,
+        "keyword_database": KEYWORD_DB.summary() if KEYWORD_DB else None,
+        "keyword_database_error": KEYWORD_DB_ERROR,
+    }
+    return jsonify(payload)
+
+
+@app.route("/api/analyze/<uuid>")
+def analyze(uuid: str):
+    """Score the stored DOM of a scan against the risk keyword database."""
+    limited = enforce_rate_limit()
+    if limited:
+        return limited
+
+    allowed, retry_after = analyze_limiter.check(client_identity())
+    if not allowed:
+        return fail(
+            f"Content analysis is limited to {Config.ANALYZE_LIMIT_PER_MINUTE} pages a "
+            f"minute. Try again in {retry_after} seconds.",
+            429,
+            "local_rate_limited",
+            retry_after=retry_after,
+        )
+
+    invalid = validate_uuid(uuid)
+    if invalid:
+        return invalid
+
+    if KEYWORD_DB is None:
+        return fail(
+            "The risk keyword database could not be loaded, so content analysis is "
+            "unavailable on this server. Check database/crypto_scam_keywords.csv.",
+            503,
+            "keyword_db_unavailable",
+        )
+
+    api_key, error = resolve_api_key()
+    if error:
+        return error
+
+    started = time.perf_counter()
+    try:
+        html = client.dom(api_key, uuid, max_bytes=Config.MAX_DOM_BYTES)
+    except UrlscanError as exc:
+        log.info("dom fetch rejected upstream: %s (%s)", exc.code, exc.status)
+        return fail(exc.message, exc.status, exc.code)
+    fetch_ms = round((time.perf_counter() - started) * 1000)
+
+    extracted = extract_text(html, max_chars=Config.MAX_TEXT_CHARS)
+    text = extracted["text"]
+
+    if not text:
+        return jsonify(
+            {
+                "ok": True,
+                "uuid": uuid.lower(),
+                "empty": True,
+                "message": (
+                    "The stored DOM has no readable text. The page may render entirely "
+                    "from script, or be an image or a redirect."
+                ),
+                "analysis": {
+                    "score": 0,
+                    "band": band_for(0),
+                    "total_words": 0,
+                    "unique_keywords": 0,
+                    "total_hits": 0,
+                    "categories": [],
+                    "severity": [],
+                    "matches": [],
+                },
+                "text": {"title": extracted["title"], "characters": 0, "excerpt": "", "truncated_chars": 0},
+                "meta": {"dom_bytes": len(html), "fetch_ms": fetch_ms, "score_ms": 0},
+            }
+        )
+
+    scored = time.perf_counter()
+    analysis = KEYWORD_DB.score_text(text)
+    score_ms = round((time.perf_counter() - scored) * 1000)
+
+    return jsonify(
+        {
+            "ok": True,
+            "uuid": uuid.lower(),
+            "empty": False,
+            "analysis": analysis,
+            "text": {
+                "title": extracted["title"],
+                "characters": len(text),
+                # The panel shows this in a collapsible block. It is page text,
+                # so the browser must insert it as text and never as markup.
+                "excerpt": text,
+                "truncated_chars": extracted["truncated_chars"],
+            },
+            "database": KEYWORD_DB.summary(),
+            "meta": {"dom_bytes": len(html), "fetch_ms": fetch_ms, "score_ms": score_ms},
+            "disclaimer": (
+                "Keyword scoring is a triage signal, not a security verdict. A high score "
+                "means the page uses the vocabulary of investment fraud; confirm before acting, "
+                "and treat a low score as inconclusive rather than safe."
+            ),
+        }
+    )
+
+
+@app.route("/api/keywords")
+def keywords():
+    """What the scorer is working from, so a score can be argued with."""
+    if KEYWORD_DB is None:
+        return fail(
+            "The risk keyword database could not be loaded on this server.",
+            503,
+            "keyword_db_unavailable",
+        )
+    return jsonify({"ok": True, **KEYWORD_DB.summary()})
 
 
 @app.route("/api/quotas")
