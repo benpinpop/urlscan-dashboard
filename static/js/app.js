@@ -1,7 +1,8 @@
 /* Contact sheet — urlscan.io search dashboard.
  *
- * All network calls go to this app's own /api/* endpoints, which add the
- * API-Key header server-side. The key never appears in a URL.
+ * urlscan calls go to this app's own /api/* endpoints, which add the API-Key
+ * header server-side. Live DNS status uses browser DNS-over-HTTPS and never
+ * sends the urlscan key. The key never appears in a URL.
  */
 
 (function () {
@@ -191,6 +192,54 @@
           return body;
         });
       });
+  }
+
+  function validDnsName(value) {
+    return /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i.test(value);
+  }
+
+  function dnsLookup(domain) {
+    var name = String(domain || "").trim().replace(/\.$/, "").toLowerCase();
+    if (!validDnsName(name)) return Promise.resolve(null);
+
+    var url = "https://cloudflare-dns.com/dns-query?name="
+      + encodeURIComponent(name) + "&type=A";
+    return fetch(url, {
+      headers: { Accept: "application/dns-json" },
+      cache: "force-cache"
+    }).then(function (response) {
+      return response.ok ? response.json() : null;
+    }).then(function (body) {
+      var answers = body && Array.isArray(body.Answer) ? body.Answer : [];
+      var address = answers.find(function (answer) {
+        return answer && answer.type === 1 && typeof answer.data === "string";
+      });
+      return address ? address.data : null;
+    }).catch(function () { return null; });
+  }
+
+  function resolveDnsResults(results) {
+    var domains = [];
+    var seen = {};
+    results.forEach(function (result) {
+      var domain = (result.domain || "").trim().replace(/\.$/, "").toLowerCase();
+      if (domain && !seen[domain]) {
+        seen[domain] = true;
+        domains.push(domain);
+      }
+    });
+
+    var started = performance.now();
+    return Promise.all(domains.map(function (domain) {
+      return dnsLookup(domain).then(function (address) {
+        results.forEach(function (result) {
+          if ((result.domain || "").trim().replace(/\.$/, "").toLowerCase() === domain) {
+            result.live_ip = address;
+            result.dns_status = address !== null;
+          }
+        });
+      });
+    })).then(function () { return Math.round(performance.now() - started); });
   }
 
   /* -------------------------------------------------------------- render */
@@ -574,9 +623,9 @@
         state.totalExact = body.meta.total_is_exact;
         state.hasMore = body.meta.has_more;
         state.cursor = body.meta.next_cursor;
-        state.dnsAvailable = body.meta.dns_enabled === true;
+        state.dnsAvailable = params.resolve_dns === "true";
         state.searchMs = body.meta.search_ms;
-        state.dnsMs = body.meta.dns_ms;
+        state.dnsMs = null;
         syncDnsUi();
 
         render();
@@ -584,6 +633,14 @@
         if (!state.results.length) {
           showAlert("No scans match that query. Check the field names, or widen the search.");
         }
+
+        if (state.dnsAvailable) {
+          return resolveDnsResults(append ? incoming : state.results).then(function (dnsMs) {
+            state.dnsMs = dnsMs;
+            render();
+          });
+        }
+
       })
       .catch(function (err) {
         showAlert(err.message || "The search failed.");

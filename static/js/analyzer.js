@@ -1,7 +1,7 @@
 /* Result analyzer — the detail view for a single urlscan.io scan.
  *
  * Talks only to this app's own /api/* endpoints, which add the API-Key header
- * server-side. Everything rendered here came from a scanned page, so it is
+ * server-side. DOM extraction and scoring are performed locally. Everything rendered here came from a scanned page, so it is
  * treated as hostile input: nodes are built with createElement and filled with
  * textContent, never innerHTML, and a resource URL is never turned into a live
  * link. Copy it or pivot on it instead.
@@ -46,6 +46,44 @@ window.URLScanAnalyzer = (function () {
 
   function clear(target) {
     if (target) target.textContent = "";
+  }
+
+  function escapeRegExp(value) {
+    return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  function highlightKeywordMatches(text, keywords) {
+    if (!text) return document.createTextNode("");
+
+    var entries = (keywords || [])
+      .map(function (keyword) { return String(keyword || "").trim(); })
+      .filter(function (keyword) { return keyword.length > 0; });
+
+    if (!entries.length) {
+      return document.createTextNode(text);
+    }
+
+    var pattern = new RegExp("(?<![a-z0-9])(?:" + entries.map(escapeRegExp).join("|") + ")(?![a-z0-9])", "gi");
+    var fragment = document.createDocumentFragment();
+    var lastIndex = 0;
+    var match;
+
+    while ((match = pattern.exec(text))) {
+      if (match.index > lastIndex) {
+        fragment.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
+      }
+      var mark = document.createElement("mark");
+      mark.className = "keyword-highlight";
+      mark.textContent = match[0];
+      fragment.appendChild(mark);
+      lastIndex = match.index + match[0].length;
+    }
+
+    if (lastIndex < text.length) {
+      fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
+    }
+
+    return fragment;
   }
 
   function fmt(value) {
@@ -717,6 +755,12 @@ window.URLScanAnalyzer = (function () {
       nameButton.title = (file.url || "") + "\nClick for headers and network detail";
       nameButton.addEventListener("click", function () { openFilePanel(file); });
       nameCell.appendChild(nameButton);
+      if (file.from_download_processor) {
+        var contentMark = node("span", "file-content-mark", "↓");
+        contentMark.title = "Download processor captured this file's contents";
+        contentMark.setAttribute("aria-label", "File contents available from the download processor");
+        nameCell.appendChild(contentMark);
+      }
       if (file.failed) {
         nameCell.appendChild(node("div", "match__meta", file.error || "Request failed"));
       }
@@ -739,8 +783,8 @@ window.URLScanAnalyzer = (function () {
       if (file.domain) {
         var domainButton = node("button", "link-btn", file.domain);
         domainButton.type = "button";
-        domainButton.title = "Search the main dashboard for this domain";
-        domainButton.addEventListener("click", function () { pivot('page.domain:"' + file.domain + '"'); });
+        domainButton.title = "Open search options for this contacted domain";
+        domainButton.addEventListener("click", function () { openDomainPanel(file.domain); });
         domainCell.appendChild(domainButton);
       } else {
         domainCell.appendChild(node("span", "", "—"));
@@ -813,8 +857,8 @@ window.URLScanAnalyzer = (function () {
       var nameCell = document.createElement("td");
       var nameButton = node("button", "link-btn", row.domain);
       nameButton.type = "button";
-      nameButton.title = "Search the main dashboard for this domain";
-      nameButton.addEventListener("click", function () { pivot('page.domain:"' + row.domain + '"'); });
+      nameButton.title = "Open search options for this contacted domain";
+      nameButton.addEventListener("click", function () { openDomainPanel(row.domain); });
       nameCell.appendChild(nameButton);
 
       var actions = node("div", "match__meta");
@@ -901,6 +945,170 @@ window.URLScanAnalyzer = (function () {
 
   /* ----------------------------------------------------- content analysis */
 
+  function normaliseClientText(value) {
+    return String(value || "")
+      .replace(/[\u2018\u2019\u201b\u00b4\u2032]/g, "'")
+      .replace(/[\u201c\u201d]/g, '"')
+      .replace(/[\u00a0\u2007\u202f]/g, " ")
+      .replace(/[\u2010-\u2015]/g, "-")
+      .replace(/\uff05/g, "%")
+      .replace(/[ \t\r\f\v]+/g, " ")
+      .replace(/\n\s*\n\s*/g, "\n\n")
+      .replace(/ ?\n ?/g, "\n")
+      .trim();
+  }
+
+  function extractClientText(html, maxChars) {
+    var documentNode = new DOMParser().parseFromString(html, "text/html");
+    Array.prototype.forEach.call(documentNode.querySelectorAll(
+      "script,style,noscript,template,svg,iframe"
+    ), function (element) { element.remove(); });
+
+    var chunks = [documentNode.body ? documentNode.body.textContent : ""];
+    Array.prototype.forEach.call(documentNode.querySelectorAll("[alt],[title],[placeholder],[value],[aria-label]"), function (element) {
+      ["alt", "title", "placeholder", "value", "aria-label"].forEach(function (attribute) {
+        if (element.hasAttribute(attribute)) chunks.push(" " + element.getAttribute(attribute) + " ");
+      });
+    });
+
+    var text = normaliseClientText(chunks.join(" "));
+    var truncated = Math.max(0, text.length - maxChars);
+    return {
+      text: truncated ? text.slice(0, maxChars) : text,
+      title: documentNode.title || null,
+      truncated_chars: truncated
+    };
+  }
+
+  function scoreClientText(text, database) {
+    var words = text.match(/[a-z0-9][a-z0-9'%./-]*/gi) || [];
+    var byKeyword = {};
+    var alternatives = database.keywords.map(function (item) {
+      byKeyword[item.keyword] = item;
+      return item.keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }).sort(function (a, b) { return b.length - a.length; });
+    var pattern = alternatives.length
+      ? new RegExp("(?<![a-z0-9])(?:" + alternatives.join("|") + ")(?![a-z0-9])", "gi")
+      : null;
+    var occurrences = {};
+    var locations = {};
+    var match;
+    while (pattern && (match = pattern.exec(text))) {
+      var keyword = match[0].toLowerCase();
+      occurrences[keyword] = (occurrences[keyword] || 0) + 1;
+      locations[keyword] = locations[keyword] || [];
+      if (locations[keyword].length < 3) {
+        var start = Math.max(0, match.index - 45);
+        var end = Math.min(text.length, match.index + match[0].length + 45);
+        locations[keyword].push({
+          offset: match.index,
+          line: text.slice(0, match.index).split("\n").length,
+          excerpt: (start ? "…" : "") + text.slice(start, end).replace(/\s+/g, " ").trim()
+            + (end < text.length ? "…" : "")
+        });
+      }
+    }
+
+    var matches = [];
+    var contextMatches = [];
+    var points = 0;
+    var perCategory = {};
+    var severityCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    Object.keys(occurrences).forEach(function (keyword) {
+      var item = byKeyword[keyword];
+      if (!item) return;
+      var count = occurrences[keyword];
+      var counted = Math.min(count, database.occurrence_cap);
+      var repeat = 1 + database.repeat_bonus * Math.min(counted - 1, database.repeat_bonus_cap);
+      var contribution = (database.tier_value[item.weight] || 0) * repeat;
+      severityCounts[item.weight] += 1;
+      var row = {
+        keyword: keyword,
+        category: item.category,
+        weight: item.weight,
+        severity: database.severity_labels[item.weight],
+        occurrences: count,
+        counted_occurrences: counted,
+        contribution: Math.round(contribution * 100) / 100,
+        scored: contribution > 0,
+        locations: locations[keyword] || []
+      };
+      if (!contribution) {
+        contextMatches.push(row);
+        return;
+      }
+      points += contribution;
+      matches.push(row);
+      var category = perCategory[item.category] || {
+        category: item.category, hits: 0, unique_keywords: 0, points: 0
+      };
+      category.hits += count;
+      category.unique_keywords += 1;
+      category.points += contribution;
+      perCategory[item.category] = category;
+    });
+
+    matches.sort(function (a, b) { return b.contribution - a.contribution || a.keyword.localeCompare(b.keyword); });
+    contextMatches.sort(function (a, b) { return b.occurrences - a.occurrences || a.keyword.localeCompare(b.keyword); });
+    var categories = Object.keys(perCategory).map(function (key) { return perCategory[key]; });
+    var breadth = database.breadth_floor + (1 - database.breadth_floor)
+      * Math.min(1, categories.length / database.breadth_full_at);
+    var base = points ? 100 * (1 - Math.exp(-points / database.signal_midpoint)) : 0;
+    var score = Math.min(100, base * breadth);
+    categories.forEach(function (entry) {
+      entry.points = Math.round(entry.points * 100) / 100;
+      entry.share = points ? Math.round(1000 * entry.points / points) / 10 : 0;
+    });
+    categories.sort(function (a, b) { return b.points - a.points; });
+    var scoredHits = matches.reduce(function (sum, entry) { return sum + entry.occurrences; }, 0);
+    var band = score >= 75 ? "high" : score >= 50 ? "elevated" : score >= 20 ? "low" : "minimal";
+    return {
+      score: Math.round(score * 10) / 10,
+      band: band,
+      total_words: words.length,
+      unique_keywords: matches.length,
+      total_hits: scoredHits,
+      signal_points: Math.round(points * 100) / 100,
+      context_keywords: contextMatches.length,
+      context_hits: contextMatches.reduce(function (sum, entry) { return sum + entry.occurrences; }, 0),
+      context_matches: contextMatches.slice(0, 40),
+      density_percent: words.length ? Math.round(100000 * scoredHits / words.length) / 1000 : 0,
+      category_breadth: categories.length,
+      breadth_multiplier: Math.round(breadth * 1000) / 1000,
+      categories: categories,
+      severity: [1, 2, 3, 4, 5].map(function (weight) {
+        return {
+          weight: weight,
+          label: database.severity_labels[weight],
+          unique_keywords: severityCounts[weight],
+          scored: (database.tier_value[weight] || 0) > 0
+        };
+      }),
+      matches: matches.slice(0, 400),
+      matches_truncated: Math.max(0, matches.length - 400)
+    };
+  }
+
+  function analyzeClientDom(html, database) {
+    var extracted = extractClientText(html, 400000);
+    var empty = !extracted.text;
+    return {
+      ok: true,
+      uuid: state.uuid,
+      empty: empty,
+      message: empty ? "The stored DOM has no readable text." : "",
+      analysis: scoreClientText(extracted.text, database),
+      text: {
+        title: extracted.title,
+        characters: extracted.text.length,
+        excerpt: extracted.text,
+        truncated_chars: extracted.truncated_chars
+      },
+      meta: { dom_bytes: html.length, fetch_ms: 0, score_ms: 0 },
+      disclaimer: "Keyword scoring is a triage signal, not a security verdict. A high score means the page uses the vocabulary of investment fraud; confirm before acting, and treat a low score as inconclusive rather than safe."
+    };
+  }
+
   function renderContentAnalysis(container) {
     clear(container);
 
@@ -921,7 +1129,7 @@ window.URLScanAnalyzer = (function () {
 
     var database = meta.keyword_database || {};
     controls.appendChild(node("span", "acard__note",
-      "Fetches the DOM urlscan stored for this scan and scores its visible text against "
+      "Fetches the DOM urlscan stored for this scan and scores its visible text in this browser against "
       + fmt(database.keyword_count || 0) + " keywords in " + fmt(database.category_count || 0)
       + " categories."));
     container.appendChild(controls);
@@ -944,9 +1152,12 @@ window.URLScanAnalyzer = (function () {
     }
 
     clearError();
-    setBusy(true, "Fetching the stored DOM and scoring its text…");
-    request("/api/analyze/" + state.uuid, {})
-      .then(function (body) {
+    setBusy(true, "Fetching the stored DOM and scoring its text in this browser…");
+    Promise.all([
+      request("/api/dom/" + state.uuid, {}),
+      request("/api/keywords", {})
+    ]).then(function (parts) {
+        var body = analyzeClientDom(parts[0].html || "", parts[1]);
         state.analysis = body;
         cacheWrite(ANALYSIS_PREFIX, state.uuid, body);
         renderAnalysis(body, document.getElementById("an-analysis-results"));
@@ -1097,8 +1308,12 @@ window.URLScanAnalyzer = (function () {
     var toggle = node("button", "btn btn--ghost btn--small", "Show the extracted page text");
     toggle.type = "button";
     toggle.setAttribute("aria-expanded", "false");
-    var box = node("pre", "excerpt-box", (body.text && body.text.excerpt) || "");
+    var box = document.createElement("pre");
+    box.className = "excerpt-box";
     box.hidden = true;
+    box.appendChild(highlightKeywordMatches((body.text && body.text.excerpt) || "", (analysis.matches || []).map(function (match) {
+      return match.keyword;
+    })));
     toggle.addEventListener("click", function () {
       box.hidden = !box.hidden;
       toggle.textContent = box.hidden ? "Show the extracted page text" : "Hide the extracted page text";
@@ -1140,8 +1355,10 @@ window.URLScanAnalyzer = (function () {
         ? ", " + match.counted_occurrences + " counted" : "")));
     item.appendChild(head);
     (match.locations || []).forEach(function (location) {
-      var excerpt = node("p", "match__excerpt", location.excerpt);
+      var excerpt = document.createElement("p");
+      excerpt.className = "match__excerpt";
       excerpt.title = "Line " + location.line + ", character offset " + location.offset;
+      excerpt.appendChild(highlightKeywordMatches(location.excerpt, [match.keyword]));
       item.appendChild(excerpt);
     });
     return item;
@@ -1178,10 +1395,24 @@ window.URLScanAnalyzer = (function () {
     urlSection.appendChild(node("div", "panel__url", file.url || "Not recorded"));
     var actions = node("div", "panel__actions");
     if (file.url) actions.appendChild(copyButton(file.url, "Copy URL"));
+    var relativePath = filePath(file);
+    var filename = file.filename || relativePath;
+    if (filename && filename !== "(no name)") {
+      actions.appendChild(copyButton(filename, "Copy filename"));
+    }
+    if (relativePath && relativePath !== "(no url)") {
+      var pathButton = node("button", "btn btn--primary btn--small", "Search relative path");
+      pathButton.type = "button";
+      pathButton.title = "Search urlscan scans that fetched this relative filename path";
+      pathButton.addEventListener("click", function () {
+        pivot('filename:"' + relativePath.replace(/"/g, '\\"') + '"');
+      });
+      actions.appendChild(pathButton);
+    }
     if (file.domain) {
       var domainButton = node("button", "btn btn--ghost btn--small", "Search this domain");
       domainButton.type = "button";
-      domainButton.addEventListener("click", function () { pivot('page.domain:"' + file.domain + '"'); });
+      domainButton.addEventListener("click", function () { openDomainPanel(file.domain); });
       actions.appendChild(domainButton);
     }
     urlSection.appendChild(actions);
@@ -1239,7 +1470,13 @@ window.URLScanAnalyzer = (function () {
     var summary = state.data.summary;
     var isMainDocument = file.url && summary.url && file.url === summary.url;
     if (isMainDocument && state.analysis && state.analysis.text && state.analysis.text.excerpt) {
-      snippet.appendChild(node("pre", "excerpt-box", state.analysis.text.excerpt.slice(0, 4000)));
+      var snippetBox = document.createElement("pre");
+      snippetBox.className = "excerpt-box";
+      snippetBox.appendChild(highlightKeywordMatches(state.analysis.text.excerpt.slice(0, 4000),
+        (state.analysis.analysis && state.analysis.analysis.matches || []).map(function (match) {
+          return match.keyword;
+        })));
+      snippet.appendChild(snippetBox);
       snippet.appendChild(node("p", "acard__note",
         "Visible text extracted from the DOM urlscan stored for this scan."));
     } else if (isMainDocument) {
@@ -1250,6 +1487,27 @@ window.URLScanAnalyzer = (function () {
         "urlscan's result API does not return response bodies, so there is no snippet for this "
         + "resource. Only the main document's text is available, through the stored DOM."));
     }
+  }
+
+  function openDomainPanel(domain) {
+    var body = openPanel("Search contacted domain");
+    body.appendChild(node("p", "panel__url", domain));
+    body.appendChild(node("p", "acard__note",
+      "Choose whether to find scans where this domain was the page itself, or any other site that contacted it."));
+
+    var actions = node("div", "panel__actions");
+    var contactedButton = node("button", "btn btn--primary btn--small", "Search domain");
+    contactedButton.type = "button";
+    contactedButton.title = "Find scans from other sites that contacted this domain";
+    contactedButton.addEventListener("click", function () { pivot('domain:"' + domain.replace(/"/g, '\\"') + '"'); });
+    actions.appendChild(contactedButton);
+
+    var pageButton = node("button", "btn btn--ghost btn--small", "Search page.domain");
+    pageButton.type = "button";
+    pageButton.title = "Find scans where this domain was the scanned page";
+    pageButton.addEventListener("click", function () { pivot('page.domain:"' + domain.replace(/"/g, '\\"') + '"'); });
+    actions.appendChild(pageButton);
+    body.appendChild(actions);
   }
 
   function headerTable(headers) {
@@ -1345,8 +1603,8 @@ window.URLScanAnalyzer = (function () {
           if (row.domain) {
             var domainButton = node("button", "link-btn", row.domain);
             domainButton.type = "button";
-            domainButton.title = "Search the main dashboard for this domain";
-            domainButton.addEventListener("click", function () { pivot('page.domain:"' + row.domain + '"'); });
+            domainButton.title = "Open search options for this contacted domain";
+            domainButton.addEventListener("click", function () { openDomainPanel(row.domain); });
             domainCell.appendChild(domainButton);
           } else {
             domainCell.appendChild(node("span", "", "—"));

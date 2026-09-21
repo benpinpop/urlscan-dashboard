@@ -14,8 +14,9 @@ Python backend (Flask), plain HTML/CSS/JS frontend, no build step.
 
 ## How it works
 
-The browser never talks to urlscan.io directly. It sends your query to this app, which forwards it
-with the `API-Key` request header and returns a trimmed JSON payload. That means:
+The browser sends urlscan requests to this app, which forwards them with the `API-Key` request header
+and returns a trimmed JSON payload. DOM extraction and keyword scoring run in the browser. Optional
+live DNS status uses Cloudflare DNS-over-HTTPS and never sends the urlscan key. That means:
 
 - the key is never in a URL, so it cannot leak through proxy logs, browser history or `Referer`
 - the browser only ever fetches same-origin, so the Content-Security-Policy can stay strict
@@ -88,14 +89,10 @@ All settings are environment variables; `.env` is read automatically if `python-
 | `FORCE_SERVER_KEY` | `false` | Ignore browser-supplied keys and always use `URLSCAN_API_KEY`. |
 | `URLSCAN_BASE_URL` | `https://urlscan.io/api/v1` | Override for testing. |
 | `REQUEST_TIMEOUT` | `30` | Seconds to wait on urlscan.io. |
-| `DNS_CACHE_MAX_ENTRIES` | `10000` | Maximum resolved domains held in each worker's memory. |
 | `RATE_LIMIT_PER_MINUTE` | `30` | Backend limit per client address. |
 | `RATE_LIMIT_PER_HOUR` | `400` | Backend limit per client address. |
 | `TRUST_PROXY` | `false` | Read `X-Forwarded-For` for the client address. |
-| `ANALYZE_LIMIT_PER_MINUTE` | `10` | Extra limit on content analysis, which fetches a whole DOM. |
-| `ANALYZE_LIMIT_PER_HOUR` | `120` | Same, per hour. |
 | `MAX_DOM_BYTES` | `4194304` | Refuse to download a stored DOM larger than this. |
-| `MAX_TEXT_CHARS` | `400000` | Characters of extracted text that get scored and returned. |
 | `RESULT_CACHE_TTL` | `600` | Seconds a fetched result stays in server memory. `0` disables it. |
 | `RESULT_CACHE_MAX_ENTRIES` | `64` | Cached results per worker. |
 | `KEYWORD_DB_PATH` | `database/crypto_scam_keywords.csv` | Risk keyword database. |
@@ -447,7 +444,7 @@ off — "Forget" clears both the field and the stored copy.
 | `GET /api/search?q=&size=&search_after=` | Proxied search |
 | `GET /api/quotas` | Remaining search quota for the key |
 | `GET /api/result/<uuid>` | Full scan result, flattened into summary / files / domains / verdicts |
-| `GET /api/analyze/<uuid>` | Fetches the stored DOM and scores its text against the keyword database |
+| `GET /api/dom/<uuid>` | Fetches the stored DOM for browser-side extraction and scoring |
 | `GET /api/keywords` | What is in the keyword database, by category |
 
 Send the key as `X-URLScan-Key` on the request unless the server holds its own.

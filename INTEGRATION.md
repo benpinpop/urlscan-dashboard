@@ -108,7 +108,7 @@ The module needs four things:
 2. **Both stylesheets.** `analyzer.css` uses tokens defined in `styles.css` (`--paper`, `--mono`,
    `--ink-faint`, the `.btn` and `.field` classes). Load `styles.css` first, or redefine those
    tokens.
-3. **The endpoints**, same-origin: `/api/result/<uuid>`, `/api/analyze/<uuid>`, and `/api/search`
+3. **The endpoints**, same-origin: `/api/result/<uuid>`, `/api/dom/<uuid>`, `/api/keywords`, and `/api/search`
    for hash correlation. If your app serves them under a prefix, change the three `request(...)`
    calls in `analyzer.js`.
 4. **`init()` with a `getKey`** that suits your auth.
@@ -192,48 +192,28 @@ Notes that matter if you consume this directly:
 also returned for a scan still processing), `rate_limited` (429, urlscan's), `local_rate_limited`
 (429, this server's), `network_error` (504).
 
-### `GET /api/analyze/<uuid>`
+### `GET /api/dom/<uuid>`
 
-Fetches the stored DOM from `{URLSCAN_SITE_URL}/dom/<uuid>/`, extracts visible text and scores it.
+Fetches the stored DOM from `{URLSCAN_SITE_URL}/dom/<uuid>/`. The browser extracts visible text and
+scores it locally using the definitions from `/api/keywords`.
 
 ```jsonc
 {
-  "ok": true, "uuid": "…", "empty": false,
-  "analysis": {
-    "score": 99.8, "band": "high",
-    "total_words": 198, "unique_keywords": 28, "total_hits": 29, "signal_points": 23.97,
-    "context_keywords": 4, "context_hits": 5, "context_matches": [ … ],
-    "density_percent": 14.6, "category_breadth": 14, "breadth_multiplier": 1.0,
-    "categories": [{ "category": "yield_promise", "hits": 5, "unique_keywords": 4,
-                     "points": 5.13, "share": 21.4 }],
-    "severity":   [{ "weight": 5, "label": "severe", "unique_keywords": 11, "scored": true }],
-    "matches": [{ "keyword": "3% daily", "category": "yield_promise", "weight": 5,
-                  "severity": "severe", "occurrences": 1, "counted_occurrences": 1,
-                  "contribution": 1.25, "scored": true,
-                  "locations": [{ "offset": 412, "line": 8, "excerpt": "…earn 3% daily with…" }] }],
-    "matches_truncated": 0,
-    "formula": "score = 100 x (1 - e^(-points / 4)) x breadth. …"
-  },
-  "text": { "title": "…", "characters": 1264, "excerpt": "…", "truncated_chars": 0 },
-  "database": { "keyword_count": 507, "category_count": 22, "categories": [ … ] },
-  "meta": { "dom_bytes": 1642, "fetch_ms": 210, "score_ms": 2 },
-  "disclaimer": "Keyword scoring is a triage signal, not a security verdict. …"
+  "ok": true, "uuid": "…", "html": "<html>…</html>",
+  "meta": { "dom_bytes": 1642 }
 }
 ```
 
-`text.excerpt` is page content. Insert it as text. Never as markup.
-
-`empty: true` means the DOM had no readable text — a script-rendered page, an image, a redirect. The
-`analysis` block is still present and zeroed.
+The HTML is attacker-controlled. Parse it as a document and never render it as markup in the app.
+The browser-side scorer returns the same analysis shape used by the analyzer UI.
 
 **Extra errors:** `response_too_large` (413) when the DOM exceeds `MAX_DOM_BYTES`,
-`keyword_db_unavailable` (503) when the CSV could not be loaded, and a tighter
-`local_rate_limited` from `ANALYZE_LIMIT_PER_MINUTE`.
+and `keyword_db_unavailable` (503) when the CSV could not be loaded.
 
 ### `GET /api/keywords`
 
-`{"ok": true, "keyword_count": 507, "category_count": 22, "categories": [{"category": "…",
-"keywords": 50}]}`. Useful for showing an analyst what a score was measured against.
+`{"ok": true, "keyword_count": 507, "category_count": 22, "keywords": [{"keyword": "…",
+"category": "…", "weight": 5}], ...}`. Useful for reproducing the browser-side score.
 
 ### `GET /api/search?q=hash:<value>&size=25`
 

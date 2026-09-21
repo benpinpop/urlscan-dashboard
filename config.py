@@ -42,8 +42,6 @@ class Config:
     FORCE_SERVER_KEY = _as_bool(os.environ.get("FORCE_SERVER_KEY"), False)
 
     REQUEST_TIMEOUT = _as_int(os.environ.get("REQUEST_TIMEOUT"), 30)
-    DNS_CACHE_MAX_ENTRIES = max(1, _as_int(os.environ.get("DNS_CACHE_MAX_ENTRIES"), 10000))
-
     # --- Result analyzer -------------------------------------------------
     # Where the risk-word database and the domain classification table live.
     KEYWORD_DB_PATH = os.environ.get("KEYWORD_DB_PATH") or None
@@ -53,9 +51,6 @@ class Config:
     # a memory guard, not a tuning knob: raise it only if you need to.
     MAX_DOM_BYTES = max(64 * 1024, _as_int(os.environ.get("MAX_DOM_BYTES"), 4 * 1024 * 1024))
 
-    # Characters of extracted text that are scored and returned to the browser.
-    MAX_TEXT_CHARS = max(10_000, _as_int(os.environ.get("MAX_TEXT_CHARS"), 400_000))
-
     # Short-lived server-side cache so repeated opens of the same scan, and the
     # analyze step that follows a pull, do not each spend a search credit.
     RESULT_CACHE_TTL = max(0, _as_int(os.environ.get("RESULT_CACHE_TTL"), 600))
@@ -64,11 +59,6 @@ class Config:
     # --- Abuse controls --------------------------------------------------
     RATE_LIMIT_PER_MINUTE = _as_int(os.environ.get("RATE_LIMIT_PER_MINUTE"), 30)
     RATE_LIMIT_PER_HOUR = _as_int(os.environ.get("RATE_LIMIT_PER_HOUR"), 400)
-
-    # Content analysis fetches and parses a whole DOM, so it gets its own,
-    # tighter budget on top of the shared per-minute limit.
-    ANALYZE_LIMIT_PER_MINUTE = _as_int(os.environ.get("ANALYZE_LIMIT_PER_MINUTE"), 10)
-    ANALYZE_LIMIT_PER_HOUR = _as_int(os.environ.get("ANALYZE_LIMIT_PER_HOUR"), 120)
 
     # Honour X-Forwarded-For. Only enable this behind a reverse proxy you
     # control, otherwise clients can spoof their own address and evade limits.
@@ -89,11 +79,9 @@ class Config:
             "debug": cls.DEBUG,
             "server_key_configured": bool(cls.URLSCAN_API_KEY),
             "force_server_key": cls.FORCE_SERVER_KEY,
-            "dns_cache_max_entries": cls.DNS_CACHE_MAX_ENTRIES,
             "trust_proxy": cls.TRUST_PROXY,
             "rate_limit_per_minute": cls.RATE_LIMIT_PER_MINUTE,
             "rate_limit_per_hour": cls.RATE_LIMIT_PER_HOUR,
-            "analyze_limit_per_minute": cls.ANALYZE_LIMIT_PER_MINUTE,
             "max_dom_bytes": cls.MAX_DOM_BYTES,
             "result_cache_ttl": cls.RESULT_CACHE_TTL,
         }

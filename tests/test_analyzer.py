@@ -1,4 +1,4 @@
-"""Tests for the result analyzer's server side.
+"""Tests for the analyzer's shared scoring and shaping data.
 
 No network and no API key: the result document comes from
 ``tests/fixture_result.json`` and the DOM from a literal string. Run with

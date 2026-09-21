@@ -71,6 +71,8 @@ multiply your crypto,yield_promise,5
 compound daily,yield_promise,4
 auto compounding,yield_promise,3
 daily compounding,yield_promise,4
+lucrative investment,yield_promise,4
+highly profitable,yield_promise,4
 profit every 24 hours,yield_promise,5
 instant profit,yield_promise,5
 instant payout,yield_promise,4
@@ -88,7 +90,12 @@ loss free,risk_denial,5
 100% safe,risk_denial,5
 100% secure,risk_denial,4
 100% guaranteed,risk_denial,5
+Protected and secure,risk_denial,4
+Transparent,risk_denial,3
 completely safe,risk_denial,4
+complete visibility,risk_denial,3
+fully insured,risk_denial,4
+fully protected,risk_denial,4
 capital protected,risk_denial,4
 capital protection,risk_denial,4
 capital guarantee,risk_denial,5
@@ -106,7 +113,13 @@ loss recovery guarantee,risk_denial,5
 no downside,risk_denial,5
 guaranteed against loss,risk_denial,5
 money back guarantee,risk_denial,3
+institutional-grade security,risk_denial,4
+professional-level security,risk_denial,4
+multi-tier encryption,risk_denial,3
+offline cold storage,risk_denial,3
+continuous live surveillance,risk_denial,3
 investment plan,hyip_plan_structure,3
+choose a plan,hyip_plan_structure,3
 investment package,hyip_plan_structure,3
 investment tier,hyip_plan_structure,3
 starter plan,hyip_plan_structure,3
@@ -214,6 +227,7 @@ unilevel,referral_ponzi,4
 3 level referral,referral_ponzi,4
 ai trading bot,ai_bot_claims,4
 ai powered trading,ai_bot_claims,4
+next level trading,ai_bot_claims,3
 ai trading,ai_bot_claims,3
 gpt trading,ai_bot_claims,4
 trading bot,ai_bot_claims,3
@@ -231,9 +245,11 @@ cross exchange arbitrage,ai_bot_claims,3
 flash loan profit,ai_bot_claims,4
 mev bot,ai_bot_claims,4
 sniper bot,ai_bot_claims,3
-automated trading,ai_bot_claims,3
+automated trading,ai_bot_claims,5
 auto trade,ai_bot_claims,3
 algorithmic trading,ai_bot_claims,2
+advanced trading,ai_bot_claims,3
+state-of-the-art,ai_bot_claims,4
 trading signals,ai_bot_claims,2
 vip signals,ai_bot_claims,3
 signal group,ai_bot_claims,3
@@ -242,6 +258,7 @@ mirror trading,ai_bot_claims,2
 managed crypto account,ai_bot_claims,4
 expert traders manage,ai_bot_claims,4
 our traders never lose,ai_bot_claims,5
+advanced trading strategies,ai_bot_claims,3
 cloud mining,mining_staking_claims,3
 mining contract,mining_staking_claims,3
 mining plan,mining_staking_claims,3
@@ -327,6 +344,8 @@ fully compliant,fake_legitimacy,2
 trust score,fake_legitimacy,2
 verified platform,fake_legitimacy,2
 legal and registered,fake_legitimacy,3
+expert guidance,fake_legitimacy,2
+expert brokerage,fake_legitimacy,2
 elon musk,fake_endorsement,5
 elon musk giveaway,fake_endorsement,5
 official musk,fake_endorsement,5
@@ -507,3 +526,5 @@ insider information,hype_language,4
 loophole,hype_language,4
 instant rich,hype_language,4
 get rich quick,hype_language,4
+better bigger faster,hype_language,3
+next era of finance,hype_language,2

@@ -229,6 +229,24 @@ class KeywordDatabase:
             ],
         }
 
+    def browser_data(self) -> dict:
+        """Return the immutable scoring inputs needed by the browser scorer."""
+        return {
+            **self.summary(),
+            "keywords": [
+                {"keyword": item.keyword, "category": item.category, "weight": item.weight}
+                for item in self.keywords
+            ],
+            "occurrence_cap": OCCURRENCE_CAP,
+            "tier_value": TIER_VALUE,
+            "repeat_bonus": REPEAT_BONUS,
+            "repeat_bonus_cap": REPEAT_BONUS_CAP,
+            "signal_midpoint": SIGNAL_MIDPOINT,
+            "breadth_floor": BREADTH_FLOOR,
+            "breadth_full_at": BREADTH_FULL_AT,
+            "severity_labels": SEVERITY_LABELS,
+        }
+
     # -- scoring ----------------------------------------------------------
 
     def score_text(self, text: str, context_chars: int = 90, max_matches: int = 400) -> dict:

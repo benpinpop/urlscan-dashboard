@@ -195,3 +195,5 @@ ngrok-free.app,hosting,ngrok
 trycloudflare.com,hosting,Cloudflare Tunnel
 duckdns.org,hosting,Dynamic DNS
 no-ip.com,hosting,Dynamic DNS
+cdn.gtranslate.net,CDN,GTranslate
+tailwindcss.com,framework,Tailwind CSS

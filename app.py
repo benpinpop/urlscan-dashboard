@@ -1,9 +1,7 @@
 """urlscan.io search dashboard — Flask backend.
 
-The browser never talks to urlscan.io directly. It posts a query here, this
-process forwards it with the ``API-Key`` header, and hands back a trimmed JSON
-payload. The key is used for the duration of one request and is never written
-to disk or to a log line.
+The browser sends urlscan requests through this app so the API key stays in a
+request header. DOM scoring and live DNS lookups happen in the browser.
 """
 
 from __future__ import annotations
@@ -12,10 +10,8 @@ import hashlib
 import logging
 import pathlib
 import re
-import socket
 import sys
 import time
-from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
 
 from flask import Flask, jsonify, render_template, request
@@ -30,7 +26,7 @@ except ImportError:  # pragma: no cover
 
 from config import Config
 from domain_intel import DomainTable
-from keyword_db import KeywordDatabase, band_for, extract_text
+from keyword_db import KeywordDatabase
 from rate_limit import RateLimiter
 from result_shaper import shape_result
 from urlscan_client import (
@@ -85,11 +81,6 @@ limiter = RateLimiter(
     per_minute=Config.RATE_LIMIT_PER_MINUTE,
     per_hour=Config.RATE_LIMIT_PER_HOUR,
 )
-analyze_limiter = RateLimiter(
-    per_minute=Config.ANALYZE_LIMIT_PER_MINUTE,
-    per_hour=Config.ANALYZE_LIMIT_PER_HOUR,
-)
-
 # Both tables are read once at import. A missing or broken keyword file must not
 # take the search dashboard down with it, so the analyzer degrades instead: the
 # content-analysis endpoint reports why it is unavailable and everything else
@@ -120,9 +111,6 @@ API_KEY_SHAPE = re.compile(r"^[A-Za-z0-9._\-]{16,128}$")
 # parse, and it reports syntax errors better than we could.
 CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 CURSOR_SHAPE = re.compile(r"^[A-Za-z0-9._:\-]+$")
-
-DNS_CACHE: dict[str, str | None] = {}
-DNS_CACHE_LOCK = Lock()
 
 # urlscan scan IDs are v4 UUIDs. Validating the shape here means the value can
 # never reach the upstream path as anything but 36 hex-and-dash characters.
@@ -241,40 +229,6 @@ def enforce_rate_limit():
     )
 
 
-def _dns_lookup(domain: str) -> tuple[str, str | None]:
-    try:
-        addresses = socket.getaddrinfo(domain, 443, type=socket.SOCK_STREAM)
-    except (OSError, UnicodeError):
-        return domain, None
-
-    for address in addresses:
-        if address and address[4]:
-            return domain, address[4][0]
-    return domain, None
-
-
-def attach_dns_status(results: list[dict]) -> None:
-    """Resolve each distinct result domain once and annotate every hit."""
-    domains = {
-        result["domain"].strip().rstrip(".").lower()
-        for result in results
-        if result.get("domain")
-    }
-    with DNS_CACHE_LOCK:
-        missing = [domain for domain in domains if domain not in DNS_CACHE]
-        if missing:
-            with ThreadPoolExecutor(max_workers=min(32, len(missing))) as executor:
-                resolved = dict(executor.map(_dns_lookup, missing))
-            for domain, address in resolved.items():
-                while len(DNS_CACHE) >= Config.DNS_CACHE_MAX_ENTRIES:
-                    DNS_CACHE.pop(next(iter(DNS_CACHE)))
-                DNS_CACHE[domain] = address
-        for result in results:
-            domain = (result.get("domain") or "").strip().rstrip(".").lower()
-            result["live_ip"] = DNS_CACHE.get(domain) if domain else None
-            result["dns_status"] = result["live_ip"] is not None
-
-
 @app.after_request
 def security_headers(response):
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
@@ -287,7 +241,7 @@ def security_headers(response):
         "Content-Security-Policy",
         "default-src 'self'; "
         "img-src 'self' data: https://urlscan.io https://*.urlscan.io; "
-        "style-src 'self'; script-src 'self'; connect-src 'self'; "
+        "style-src 'self'; script-src 'self'; connect-src 'self' https://cloudflare-dns.com; "
         "form-action 'none'; frame-ancestors 'none'; base-uri 'self'",
     )
     # Search responses are per-key and must not be cached by a shared proxy.
@@ -448,12 +402,6 @@ def search():
 
     raw_results = payload.get("results") or []
     results = [normalise_result(item, i + 1) for i, item in enumerate(raw_results)]
-    dns_ms = 0
-    if resolve_dns:
-        dns_started = time.perf_counter()
-        attach_dns_status(results)
-        dns_ms = round((time.perf_counter() - dns_started) * 1000)
-
     total = payload.get("total")
     has_more = bool(payload.get("has_more"))
 
@@ -469,8 +417,8 @@ def search():
                 "has_more": has_more,
                 "took_ms": payload.get("took"),
                 "search_ms": search_ms,
-                "dns_ms": dns_ms,
-                "dns_enabled": resolve_dns,
+                "dns_ms": None,
+                "dns_enabled": False,
                 "next_cursor": build_cursor(raw_results) if has_more else None,
                 "query": query,
                 "size": size,
@@ -555,102 +503,33 @@ def result(uuid: str):
     return jsonify(payload)
 
 
-@app.route("/api/analyze/<uuid>")
-def analyze(uuid: str):
-    """Score the stored DOM of a scan against the risk keyword database."""
+@app.route("/api/dom/<uuid>")
+def dom(uuid: str):
+    """Fetch the stored DOM; extraction and scoring are performed by the browser."""
     limited = enforce_rate_limit()
     if limited:
         return limited
-
-    allowed, retry_after = analyze_limiter.check(client_identity())
-    if not allowed:
-        return fail(
-            f"Content analysis is limited to {Config.ANALYZE_LIMIT_PER_MINUTE} pages a "
-            f"minute. Try again in {retry_after} seconds.",
-            429,
-            "local_rate_limited",
-            retry_after=retry_after,
-        )
 
     invalid = validate_uuid(uuid)
     if invalid:
         return invalid
 
-    if KEYWORD_DB is None:
-        return fail(
-            "The risk keyword database could not be loaded, so content analysis is "
-            "unavailable on this server. Check database/crypto_scam_keywords.csv.",
-            503,
-            "keyword_db_unavailable",
-        )
-
     api_key, error = resolve_api_key()
     if error:
         return error
 
-    started = time.perf_counter()
     try:
         html = client.dom(api_key, uuid, max_bytes=Config.MAX_DOM_BYTES)
     except UrlscanError as exc:
         log.info("dom fetch rejected upstream: %s (%s)", exc.code, exc.status)
         return fail(exc.message, exc.status, exc.code)
-    fetch_ms = round((time.perf_counter() - started) * 1000)
 
-    extracted = extract_text(html, max_chars=Config.MAX_TEXT_CHARS)
-    text = extracted["text"]
-
-    if not text:
-        return jsonify(
-            {
-                "ok": True,
-                "uuid": uuid.lower(),
-                "empty": True,
-                "message": (
-                    "The stored DOM has no readable text. The page may render entirely "
-                    "from script, or be an image or a redirect."
-                ),
-                "analysis": {
-                    "score": 0,
-                    "band": band_for(0),
-                    "total_words": 0,
-                    "unique_keywords": 0,
-                    "total_hits": 0,
-                    "categories": [],
-                    "severity": [],
-                    "matches": [],
-                },
-                "text": {"title": extracted["title"], "characters": 0, "excerpt": "", "truncated_chars": 0},
-                "meta": {"dom_bytes": len(html), "fetch_ms": fetch_ms, "score_ms": 0},
-            }
-        )
-
-    scored = time.perf_counter()
-    analysis = KEYWORD_DB.score_text(text)
-    score_ms = round((time.perf_counter() - scored) * 1000)
-
-    return jsonify(
-        {
-            "ok": True,
-            "uuid": uuid.lower(),
-            "empty": False,
-            "analysis": analysis,
-            "text": {
-                "title": extracted["title"],
-                "characters": len(text),
-                # The panel shows this in a collapsible block. It is page text,
-                # so the browser must insert it as text and never as markup.
-                "excerpt": text,
-                "truncated_chars": extracted["truncated_chars"],
-            },
-            "database": KEYWORD_DB.summary(),
-            "meta": {"dom_bytes": len(html), "fetch_ms": fetch_ms, "score_ms": score_ms},
-            "disclaimer": (
-                "Keyword scoring is a triage signal, not a security verdict. A high score "
-                "means the page uses the vocabulary of investment fraud; confirm before acting, "
-                "and treat a low score as inconclusive rather than safe."
-            ),
-        }
-    )
+    return jsonify({
+        "ok": True,
+        "uuid": uuid.lower(),
+        "html": html,
+        "meta": {"dom_bytes": len(html)},
+    })
 
 
 @app.route("/api/keywords")
@@ -662,7 +541,7 @@ def keywords():
             503,
             "keyword_db_unavailable",
         )
-    return jsonify({"ok": True, **KEYWORD_DB.summary()})
+    return jsonify({"ok": True, **KEYWORD_DB.browser_data()})
 
 
 @app.route("/api/quotas")

@@ -58,7 +58,6 @@ class RouteTests(unittest.TestCase):
         application.RESULT_CACHE.clear()
         # Limiters are process-wide; a fresh one per test keeps them independent.
         application.limiter._hits.clear()
-        application.analyze_limiter._hits.clear()
         application.app.config["TESTING"] = True
         self.http = application.app.test_client()
 
@@ -128,47 +127,27 @@ class RouteTests(unittest.TestCase):
         response, _ = self.get(f"/api/result/{UUID}")
         self.assertEqual(response.headers["Cache-Control"], "no-store")
 
-    # -- /api/analyze -----------------------------------------------------
+    # -- /api/dom ---------------------------------------------------------
 
-    def test_analyze_scores_the_dom(self):
-        response, body = self.get(f"/api/analyze/{UUID}")
+    def test_dom_returns_raw_html_for_browser_analysis(self):
+        response, body = self.get(f"/api/dom/{UUID}")
         self.assertEqual(response.status_code, 200)
-        self.assertFalse(body["empty"])
-        self.assertGreater(body["analysis"]["score"], 50)
-        self.assertEqual(body["analysis"]["band"], "high")
-        self.assertGreater(body["analysis"]["unique_keywords"], 5)
-        self.assertTrue(body["analysis"]["categories"])
-        self.assertTrue(body["analysis"]["formula"])
-        self.assertIn("triage", body["disclaimer"])
-        self.assertEqual(body["text"]["title"], "CloudMine Pro")
-        self.assertIn("Guaranteed Daily Returns", body["text"]["excerpt"])
+        self.assertEqual(body["html"], DOM)
+        self.assertEqual(body["uuid"], UUID)
 
-    def test_analyze_handles_a_page_with_no_text(self):
-        self.stub.dom_body = "<html><head></head><body><script>void 0</script></body></html>"
-        response, body = self.get(f"/api/analyze/{UUID}")
-        self.assertEqual(response.status_code, 200)
-        self.assertTrue(body["empty"])
-        self.assertEqual(body["analysis"]["score"], 0)
-
-    def test_analyze_reports_an_oversized_dom(self):
+    def test_dom_reports_an_oversized_dom(self):
         self.stub.dom_error = UrlscanTooLargeError("too big")
-        response, body = self.get(f"/api/analyze/{UUID}")
+        response, body = self.get(f"/api/dom/{UUID}")
         self.assertEqual(response.status_code, 413)
         self.assertEqual(body["error"]["code"], "response_too_large")
 
-    def test_analyze_reports_a_missing_dom(self):
+    def test_dom_reports_a_missing_dom(self):
         self.stub.dom_error = UrlscanNotFoundError("no dom")
-        response, body = self.get(f"/api/analyze/{UUID}")
+        response, body = self.get(f"/api/dom/{UUID}")
         self.assertEqual(response.status_code, 404)
 
-    def test_analyze_has_its_own_rate_limit(self):
-        limit = application.Config.ANALYZE_LIMIT_PER_MINUTE
-        codes = [self.get(f"/api/analyze/{UUID}")[0].status_code for _ in range(limit + 3)]
-        self.assertIn(429, codes)
-        self.assertEqual(codes[0], 200)
-
-    def test_analyze_rejects_a_bad_uuid(self):
-        response, body = self.get("/api/analyze/nope")
+    def test_dom_rejects_a_bad_uuid(self):
+        response, body = self.get("/api/dom/nope")
         self.assertEqual(response.status_code, 400)
         self.assertEqual(body["error"]["code"], "invalid_uuid")
         self.assertEqual(self.stub.dom_calls, [])
@@ -180,6 +159,7 @@ class RouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertGreater(body["keyword_count"], 400)
         self.assertTrue(body["categories"])
+        self.assertTrue(body["keywords"])
 
     def test_config_advertises_the_analyzer(self):
         response, body = self.get("/api/config")
