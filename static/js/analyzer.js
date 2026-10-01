@@ -7,7 +7,7 @@
  * link. Copy it or pivot on it instead.
  *
  * Public surface, used by app.js:
- *   URLScanAnalyzer.init({ getKey, onPivot })
+ *   URLScanAnalyzer.init({ getKey, onPivot, onReport, checkSite })
  *   URLScanAnalyzer.open(uuid)
  *   URLScanAnalyzer.close()
  *   URLScanAnalyzer.clearCache()
@@ -20,7 +20,9 @@ window.URLScanAnalyzer = (function () {
   var ANALYSIS_PREFIX = "urlscan-analyzer.analysis.";
   var UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-  var hooks = { getKey: null, onPivot: null };
+  /* onReport(siteUrl) and checkSite(siteUrl) -> Promise<{tone, title, detail, action}>
+     are optional: without them the Scambusters buttons stay hidden. */
+  var hooks = { getKey: null, onPivot: null, onReport: null, checkSite: null };
 
   var state = {
     uuid: null,
@@ -1670,8 +1672,17 @@ window.URLScanAnalyzer = (function () {
     el.panelTitle = document.getElementById("an-panel-title");
     el.panelBody = document.getElementById("an-panel-body");
     el.panelClose = document.getElementById("an-panel-close");
+    el.sbCheck = document.getElementById("an-sb-check");
+    el.sbReport = document.getElementById("an-sb-report");
+    el.sbStatus = document.getElementById("an-sb-status");
 
     el.back.addEventListener("click", close);
+    if (el.sbCheck) el.sbCheck.addEventListener("click", checkScambusters);
+    if (el.sbReport) {
+      el.sbReport.addEventListener("click", function () {
+        if (typeof hooks.onReport === "function" && state.data) hooks.onReport(scanSiteUrl(state.data.summary));
+      });
+    }
     el.alertClose.addEventListener("click", clearError);
     el.pull.addEventListener("click", function () {
       var value = (el.uuidInput.value || "").trim();
@@ -1808,6 +1819,59 @@ window.URLScanAnalyzer = (function () {
     } else {
       el.report.hidden = true;
     }
+    paintScambusters();
+  }
+
+  /* ------------------------------------------------------- Scambusters */
+
+  function scanSiteUrl(summary) {
+    return (summary && (summary.url || summary.submitted_url || summary.domain)) || "";
+  }
+
+  function paintScambusters() {
+    if (!el.sbCheck) return;
+    var site = state.data ? scanSiteUrl(state.data.summary) : "";
+    el.sbCheck.hidden = !(typeof hooks.checkSite === "function" && site);
+    el.sbReport.hidden = !(typeof hooks.onReport === "function" && site);
+    el.sbStatus.hidden = true;             /* a new scan starts with no stale lookup on screen */
+    clear(el.sbStatus);
+    state.sbToken = null;
+  }
+
+  function checkScambusters() {
+    if (typeof hooks.checkSite !== "function" || !state.data) return;
+    var site = scanSiteUrl(state.data.summary);
+    var token = String(Date.now()) + Math.random();
+    state.sbToken = token;
+    clear(el.sbStatus);
+    el.sbStatus.className = "sb-status sb-status--busy";
+    el.sbStatus.appendChild(node("p", "", "Checking Scambusters for " + (state.data.summary.domain || site) + "…"));
+    el.sbStatus.hidden = false;
+    el.sbCheck.disabled = true;
+
+    Promise.resolve(hooks.checkSite(site)).then(function (outcome) {
+      if (state.sbToken !== token) return;   /* a different scan was opened meanwhile */
+      outcome = outcome || {};
+      clear(el.sbStatus);
+      el.sbStatus.className = "sb-status sb-status--" + (outcome.tone || "info");
+      el.sbStatus.appendChild(node("p", "", outcome.title || "No answer from Scambusters."));
+      if (outcome.detail) el.sbStatus.appendChild(node("p", "sb-status__detail", outcome.detail));
+      if (outcome.action && typeof outcome.action.run === "function") {
+        var bar = node("div", "panel__actions");
+        var button = node("button", "btn btn--ghost btn--small", outcome.action.label);
+        button.type = "button";
+        button.addEventListener("click", outcome.action.run);
+        bar.appendChild(button);
+        el.sbStatus.appendChild(bar);
+      }
+    }, function () {
+      if (state.sbToken !== token) return;
+      clear(el.sbStatus);
+      el.sbStatus.className = "sb-status sb-status--bad";
+      el.sbStatus.appendChild(node("p", "", "Couldn't check Scambusters — please retry."));
+    }).then(function () {
+      el.sbCheck.disabled = false;
+    });
   }
 
   function load(uuid, force) {
@@ -1879,6 +1943,8 @@ window.URLScanAnalyzer = (function () {
       return field ? (field.value || "").trim() : "";
     };
     hooks.onPivot = options.onPivot || null;
+    hooks.onReport = options.onReport || null;
+    hooks.checkSite = options.checkSite || null;
     buildShell();
   }
 

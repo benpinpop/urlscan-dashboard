@@ -812,6 +812,7 @@
    * a callback rather than reading the field itself, and it hands pivots back
    * here so a domain or hash click lands in this grid. */
   if (window.URLScanAnalyzer) {
+    var reporter = window.ScambustersReporter || null;   /* static/js/scambusters.js, optional */
     window.URLScanAnalyzer.init({
       getKey: currentKey,
       onPivot: function (query) {
@@ -819,7 +820,9 @@
         el.query.value = query;
         el.filter.value = "";
         runSearch(false);
-      }
+      },
+      onReport: reporter ? function (siteUrl) { reporter.open({ siteUrl: siteUrl }); } : null,
+      checkSite: reporter ? reporter.describeCheck : null
     });
 
     el.openAnalyzer.addEventListener("click", function () {

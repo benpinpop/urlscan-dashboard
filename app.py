@@ -29,12 +29,21 @@ from domain_intel import DomainTable
 from keyword_db import KeywordDatabase
 from rate_limit import RateLimiter
 from result_shaper import shape_result
+from scambusters import (
+    KEY_SHAPE as SCAMBUSTERS_KEY_SHAPE,
+    MAX_WALLETS as SCAMBUSTERS_MAX_WALLETS,
+    ScambustersClient,
+    ScambustersNetworkError,
+    build_submission,
+    site_hostname,
+)
 from urlscan_client import (
     UrlscanClient,
     UrlscanError,
     build_cursor,
     normalise_result,
 )
+from wallet_validation import CHAINS, EVM_CHAINS, OTHER_CHAINS, detect_chain, validate_wallet
 
 # --------------------------------------------------------------------------
 # Logging. The scrubber is a backstop: we do not deliberately log keys, but a
@@ -43,6 +52,7 @@ from urlscan_client import (
 
 KEY_SHAPE = re.compile(
     r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b"
+    r"|\bsb_[A-Za-z0-9_\-]{8,}"  # Scambusters keys
 )
 
 
@@ -81,6 +91,9 @@ limiter = RateLimiter(
     per_minute=Config.RATE_LIMIT_PER_MINUTE,
     per_hour=Config.RATE_LIMIT_PER_HOUR,
 )
+scambusters_client = ScambustersClient(Config.SCAMBUSTERS_BASE_URL, timeout=Config.SCAMBUSTERS_TIMEOUT)
+# Separate budget so reporting never eats into the urlscan search allowance.
+scambusters_limiter = RateLimiter(per_minute=Config.SCAMBUSTERS_RATE_LIMIT_PER_MINUTE, per_hour=0)
 # Both tables are read once at import. A missing or broken keyword file must not
 # take the search dashboard down with it, so the analyzer degrades instead: the
 # content-analysis endpoint reports why it is unavailable and everything else
@@ -259,8 +272,10 @@ REQUIRED_ASSETS = (
     "templates/index.html",
     "static/css/styles.css",
     "static/css/analyzer.css",
+    "static/css/scambusters.css",
     "static/js/app.js",
     "static/js/analyzer.js",
+    "static/js/scambusters.js",
 )
 
 
@@ -313,6 +328,9 @@ def index():
         sizes=Config.ALLOWED_SIZES,
         server_key_configured=bool(Config.URLSCAN_API_KEY),
         force_server_key=Config.FORCE_SERVER_KEY,
+        evm_chains=[(code, CHAINS[code]) for code in EVM_CHAINS],
+        other_chains=[(code, CHAINS[code]) for code in OTHER_CHAINS],
+        max_wallets=SCAMBUSTERS_MAX_WALLETS,
     )
 
 
@@ -565,6 +583,105 @@ def quotas():
         search_quota = limits["search"]
 
     return jsonify({"ok": True, "search": search_quota, "limits": limits or {}})
+
+
+# --------------------------------------------------------------------------
+# Scambusters reporter. Wallet rules come from wallet_validation (ported from
+# the ScamHunt CTF); submissions and lookups are forwarded to Scambusters with
+# the user's own key. Scambusters' status and body are returned unchanged.
+# --------------------------------------------------------------------------
+
+
+@app.route("/api/wallets/check", methods=["POST"])
+def wallet_check():
+    """Live validation for the reporter form (the submit route re-validates)."""
+    data = request.get_json(silent=True) or {}
+    address = str(data.get("address") or "")[:200]
+    requested = str(data.get("chain") or "")
+    detection = detect_chain(address)
+    chain = requested if requested in CHAINS else (detection.chain or "")
+    base = {"detected": detection.as_dict(), "chain": chain, "requires_tag": chain == "xrp"}
+    if not address.strip():
+        return jsonify({**base, "valid": False, "error": ""})
+    if not chain:
+        return jsonify({**base, "valid": False,
+                        "error": "Unrecognised address format — it doesn't match any supported chain."})
+    check = validate_wallet(chain, address)
+    return jsonify({
+        **base,
+        "chain_label": CHAINS[chain],
+        "valid": check.valid,
+        "canonical": check.canonical,
+        "format": check.format,
+        "error": check.errors[0] if check.errors else "",
+    })
+
+
+def _scambusters_key():
+    """(key, None) or (None, error response). The key is never logged or echoed."""
+    key = (request.headers.get("X-Scambusters-Key") or "").strip()
+    if not key:
+        return None, (jsonify({"error": "Add your Scambusters API key first.", "source": "local"}), 401)
+    if not SCAMBUSTERS_KEY_SHAPE.match(key):
+        return None, (jsonify({"error": "That doesn't look like a Scambusters API key (sb_…).",
+                               "source": "local"}), 401)
+    return key, None
+
+
+def _scambusters_limited():
+    allowed, retry_after = scambusters_limiter.check(client_identity())
+    if allowed:
+        return None
+    response = jsonify({"error": f"Too many Scambusters requests from this address. Try again in "
+                                 f"{retry_after} seconds.", "retry_after": retry_after, "source": "local"})
+    response.headers["Retry-After"] = str(retry_after)
+    return response, 429
+
+
+def _relay(status: int, body: dict, retry_after: str | None):
+    response = jsonify(body)
+    if retry_after and retry_after.strip().isdigit():
+        response.headers["Retry-After"] = retry_after.strip()
+    return response, status
+
+
+@app.route("/api/scambusters/submit", methods=["POST"])
+def scambusters_submit():
+    limited = _scambusters_limited()
+    if limited:
+        return limited
+    key, error = _scambusters_key()
+    if error:
+        return error
+    payload, errors = build_submission(request.get_json(silent=True))
+    if errors:
+        return jsonify({"errors": errors, "source": "local"}), 400
+    try:
+        status, body, retry_after = scambusters_client.submit(key, payload)
+    except ScambustersNetworkError as exc:
+        return jsonify({"error": exc.message, "source": "proxy"}), exc.status
+    log.info("scambusters submit: HTTP %s, %d wallet(s)", status, len(payload.get("wallets", [])))
+    return _relay(status, body, retry_after)
+
+
+@app.route("/api/scambusters/check")
+def scambusters_check():
+    limited = _scambusters_limited()
+    if limited:
+        return limited
+    key, error = _scambusters_key()
+    if error:
+        return error
+    site_url = (request.args.get("site_url") or "").strip()
+    if not site_url:
+        return jsonify({"error": "site_url query parameter is required.", "source": "local"}), 400
+    if site_hostname(site_url) is None:
+        return jsonify({"error": f"site_url is not a valid URL: {site_url[:120]!r}", "source": "local"}), 400
+    try:
+        status, body, retry_after = scambusters_client.check(key, site_url)
+    except ScambustersNetworkError as exc:
+        return jsonify({"error": exc.message, "source": "proxy"}), exc.status
+    return _relay(status, body, retry_after)
 
 
 @app.errorhandler(HTTPException)

@@ -56,6 +56,17 @@ class Config:
     RESULT_CACHE_TTL = max(0, _as_int(os.environ.get("RESULT_CACHE_TTL"), 600))
     RESULT_CACHE_MAX_ENTRIES = max(1, _as_int(os.environ.get("RESULT_CACHE_MAX_ENTRIES"), 64))
 
+    # --- Scambusters reporter --------------------------------------------
+    # The browser sends reports and lookups here; this app forwards them with
+    # the user's own key (sent per request, never stored server-side).
+    SCAMBUSTERS_BASE_URL = os.environ.get(
+        "SCAMBUSTERS_BASE_URL", "https://scambuster.intelligenceforgood.org"
+    )
+    SCAMBUSTERS_TIMEOUT = max(1, _as_int(os.environ.get("SCAMBUSTERS_TIMEOUT"), 20))
+    # Local backstop per client address. Scambusters enforces its own limits
+    # per student (50 submissions/min; 50 checks/min and 500/h).
+    SCAMBUSTERS_RATE_LIMIT_PER_MINUTE = _as_int(os.environ.get("SCAMBUSTERS_RATE_LIMIT_PER_MINUTE"), 120)
+
     # --- Abuse controls --------------------------------------------------
     RATE_LIMIT_PER_MINUTE = _as_int(os.environ.get("RATE_LIMIT_PER_MINUTE"), 30)
     RATE_LIMIT_PER_HOUR = _as_int(os.environ.get("RATE_LIMIT_PER_HOUR"), 400)
@@ -84,4 +95,5 @@ class Config:
             "rate_limit_per_hour": cls.RATE_LIMIT_PER_HOUR,
             "max_dom_bytes": cls.MAX_DOM_BYTES,
             "result_cache_ttl": cls.RESULT_CACHE_TTL,
+            "scambusters_base_url": cls.SCAMBUSTERS_BASE_URL,
         }

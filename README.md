@@ -99,6 +99,9 @@ All settings are environment variables; `.env` is read automatically if `python-
 | `DOMAIN_TABLE_PATH` | `database/domain_categories.csv` | Third-party domain classification table. |
 | `URLSCAN_SITE_URL` | `https://urlscan.io` | Where stored DOMs are fetched from. |
 | `WEB_CONCURRENCY` / `WEB_THREADS` | `4` / `4` | Gunicorn workers and threads. |
+| `SCAMBUSTERS_BASE_URL` | `https://scambuster.intelligenceforgood.org` | Where reports and lookups are forwarded. |
+| `SCAMBUSTERS_TIMEOUT` | `20` | Seconds to wait on Scambusters. |
+| `SCAMBUSTERS_RATE_LIMIT_PER_MINUTE` | `120` | This server's backstop per client address for reporter calls. |
 
 **Two ways to run this.** Leave `URLSCAN_API_KEY` unset for a shared instance where every analyst
 pastes their own key and spends their own quota — that is the better default. Set it, plus
@@ -370,6 +373,67 @@ Every response carries that caveat, and the UI prints it under every score.
 
 ---
 
+## Reporting to Scambusters
+
+**Report scam** in the header opens a reporter panel that submits a scam site, plus the wallet
+addresses it shows, to [Scambusters](https://scambuster.intelligenceforgood.org). The result analyzer
+gets two buttons for the scan you are looking at: **Check Scambusters** (is this site already known,
+and are its wallets fresh?) and **Report to Scambusters** (opens the reporter with the site filled in).
+
+### Your key
+
+Paste your Scambusters key (`sb_…`, from `/get-api-key` in Discord) at the top of the panel. It is
+kept in this tab's `sessionStorage` under `scambusters_api_key`, so it is gone when the tab closes, and
+it is shown masked as `sb_••••••••1234` with **Edit** and **Clear**. The key travels to this server as
+the `X-Scambusters-Key` header on each request and is forwarded as `Authorization: Bearer`. It is
+never stored or logged server-side, and messages never show more than its last four characters.
+
+### The form
+
+- **Site URL** is required and needs a parseable hostname. `https://` is optional (Scambusters adds
+  it), and defanged links such as `hxxps://evil[.]example` are converted when you leave the field.
+- **Wallets** are optional, up to 30 per report. Each row detects the chain as you type or paste and
+  pre-selects it; `0x…` defaults to Ethereum with the other EVM networks offered. Every address is
+  checked on this server by the same wallet module the ScamHunt CTF uses (Base58Check, Bech32/Bech32m,
+  EIP-55, CashAddr, Cardano), and the report is **blocked** while any row fails, including a chain you
+  picked by hand that does not match the address (say, Litecoin for a `0x` address).
+- **XRP addresses need a destination tag.** The tag field appears only when the chain is XRP, is
+  required there, and must be a whole number up to 4294967295. It is never sent for any other chain.
+  Only classic `r…` addresses are accepted; X-addresses are refused with a hint to enter the `r…`
+  address and the tag separately.
+- **Submit** stays disabled, with the reason printed beside it, until a key is saved, the site URL is
+  valid and every wallet has passed.
+
+### What the responses mean
+
+| Scambusters says | The panel shows |
+|---|---|
+| 201 queued | Submission ID, queue time in your local timezone, wallet count; the form clears |
+| 200 duplicate | "Already submitted" with the matching `submission_key` |
+| 400 | Each error under the field or wallet row it names (`wallets[2].chain …`); the rest in a banner |
+| 401 | "Invalid or revoked" and the key editor opens |
+| 403 expired | "Use /rotate-api-key in Discord to get a new one" and the key editor opens |
+| 403 not approved | Share your scraper source with Sam; submitting stays blocked for that key (checks still work) |
+| 429 | A countdown on the Submit button before it re-enables |
+| 503 | Temporary: **Retry now** |
+| 500, timeout, network | Retry or contact support; the button never stays stuck |
+
+**Check Scambusters** in the analyzer reports whether the site has wallets on record, when the newest
+was collected (local time), and whether it is **stale** (over 30 days old: scammers rotate wallets,
+and fresh ones earn points), with a one-click **Report** for anything stale, unreported or walletless.
+
+### Why it goes through this server
+
+This app's Content-Security-Policy only lets the page talk to its own origin, and that is what keeps
+the urlscan key safe. Rather than loosen that for a third party, the reporter posts to
+`/api/scambusters/submit` and `/api/scambusters/check`, which re-validate the report with the same
+wallet rules and forward it. Scambusters' status code and response body come back unchanged.
+Scambusters limits each student to 50 submissions a minute and 50 checks a minute (500 an hour); this
+server adds its own backstop per client address (`SCAMBUSTERS_RATE_LIMIT_PER_MINUTE`, default 120),
+counted separately from the urlscan search limit.
+
+---
+
 ## Tests
 
 Fixture-driven, no network and no API key:
@@ -383,6 +447,10 @@ classification and result shaping — including a deliberately awkward fixture w
 request with no response at all, a malformed hash and a download with three digests.
 `tests/test_routes.py` covers the endpoints with urlscan.io stubbed out: validation, error mapping,
 per-key caching and rate limiting.
+`tests/test_wallet_validation.py` carries the ScamHunt CTF's own wallet and codec tests (published
+checksum vectors for every format), plus the XRP additions.
+`tests/test_scambusters.py` covers the reporter routes with Scambusters stubbed out: the wallet-check
+contract, local re-validation, the exact payload forwarded, and every upstream status relayed unchanged.
 
 For frontend work without spending API credits:
 
@@ -425,6 +493,15 @@ For the analyzer specifically:
 - **Content analysis has its own rate limit** on top of the shared one, because it fetches and parses
   a whole document per call.
 
+For the Scambusters reporter:
+
+- **The Scambusters key is per tab and per request.** It lives in `sessionStorage`, is sent only as
+  a request header to this origin, is forwarded only as `Authorization: Bearer`, and is masked by the
+  log scrubber like urlscan keys. No response echoes it.
+- **Reports are re-validated server-side** with the same wallet rules the form uses, so a modified
+  page cannot push a malformed or formula-injection address (`=`, `+`, `-`, `@`…) upstream.
+- **Redirects are not followed** when forwarding, so the key only ever reaches `SCAMBUSTERS_BASE_URL`.
+
 ### The localStorage option
 
 Ticking "Keep this key in this browser" writes the key to `localStorage`. It survives a reload, and it
@@ -446,8 +523,13 @@ off — "Forget" clears both the field and the stored copy.
 | `GET /api/result/<uuid>` | Full scan result, flattened into summary / files / domains / verdicts |
 | `GET /api/dom/<uuid>` | Fetches the stored DOM for browser-side extraction and scoring |
 | `GET /api/keywords` | What is in the keyword database, by category |
+| `POST /api/wallets/check` | Detects and validates one wallet address (the reporter's live check) |
+| `POST /api/scambusters/submit` | Re-validates a report and forwards it to Scambusters |
+| `GET /api/scambusters/check?site_url=` | Forwards a Scambusters lookup for one site |
 
-Send the key as `X-URLScan-Key` on the request unless the server holds its own.
+Send the key as `X-URLScan-Key` on the request unless the server holds its own. The Scambusters
+routes take `X-Scambusters-Key` instead and return Scambusters' own status and body (see
+[INTEGRATION.md](INTEGRATION.md#the-scambusters-reporter)).
 
 ```bash
 curl -s 'http://127.0.0.1:8000/api/search?q=page.domain:example.com&size=10' \
@@ -468,12 +550,16 @@ result_shaper.py       Turns one result document into the analyzer's payload
 keyword_db.py          Keyword database, HTML-to-text, risk scoring
 domain_intel.py        Third-party domain classification
 rate_limit.py          In-memory sliding-window limiter
+scambusters.py         Scambusters pass-through client and report validation
+wallet_validation/     Wallet chain detection + checksums, ported from the ScamHunt CTF (+ XRP)
 wsgi.py                Gunicorn entrypoint
-templates/index.html   Markup for both dashboards
+templates/index.html   Markup for both dashboards and the reporter
 static/css/styles.css  Contact sheet styles
 static/css/analyzer.css  Analyzer styles
+static/css/scambusters.css  Reporter styles
 static/js/app.js       Search, sorting, filtering, pagination, lightbox
 static/js/analyzer.js  The result analyzer
+static/js/scambusters.js  The Scambusters reporter
 database/              Keyword database and domain classification table (both CSV, both editable)
 tests/                 Fixture-driven tests and a stub server for UI work
 deploy/                systemd unit and nginx example

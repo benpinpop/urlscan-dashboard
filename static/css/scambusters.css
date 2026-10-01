@@ -1,0 +1,246 @@
+/* ==========================================================================
+   Scambusters reporter — the "Report scam" slide-over and the analyzer's
+   Scambusters status strip.
+
+   Reuses the analyzer's .panel slide-over and the sheet's tokens. As in the
+   rest of the dashboard, status colour is an accent only: every state also
+   says what it means in words, and message text stays in the ink colours.
+   ========================================================================== */
+
+/* --- Entry points -------------------------------------------------------- */
+
+.sheet-head__tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.sb-open {
+  background: linear-gradient(120deg, #8f2a3c, #c53d52);
+  border-color: #e0657e;
+  color: #fff;
+}
+
+.sb-open:hover { background: linear-gradient(120deg, #7c2233, #b3344a); color: #fff; }
+
+/* --- Panel --------------------------------------------------------------- */
+
+.sb { z-index: 75; }   /* above the analyzer (60) and its own detail panel (70) */
+
+.sb__inner { width: min(680px, 100%); }
+
+.sb .label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #b7bac1;
+  margin: 12px 0 5px;
+}
+
+.sb-req,
+.sb-opt {
+  font-weight: 500;
+  font-size: 11px;
+  color: var(--ink-faint);
+  margin-left: 4px;
+}
+
+.sb .hint code,
+.sb .key__note code { font-size: 0.95em; }
+
+.sb-error {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  color: #ffc2cb;
+  border-left: 3px solid var(--a-malicious);
+  padding-left: 8px;
+}
+
+.sb .field[aria-invalid="true"] { border-color: var(--a-malicious); }
+
+/* --- Key ----------------------------------------------------------------- */
+
+.sb-key.is-set #sb-key-heading::after {
+  content: " · saved for this tab";
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--a-clean);
+}
+
+.sb-key__saved {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.sb-key__mask {
+  flex: 1 1 auto;
+  padding: 7px 10px;
+  border: 1px solid var(--a-line);
+  border-radius: 6px;
+  background: rgba(6, 19, 43, 0.7);
+  color: #cbdcf0;
+  letter-spacing: 0.04em;
+}
+
+/* --- Wallet rows ----------------------------------------------------------- */
+
+.sb-wallets {
+  margin: 20px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.sb-wallets legend {
+  font-size: 12px;
+  font-weight: 600;
+  color: #b7bac1;
+  padding: 0;
+}
+
+.sb-wallets__rows { display: grid; gap: 10px; margin: 10px 0; }
+
+.sb-wallet {
+  padding: 10px;
+  border: 1px solid var(--a-line);
+  border-left: 3px solid var(--a-line-strong);
+  border-radius: 6px;
+  background: rgba(6, 19, 43, 0.45);
+}
+
+.sb-wallet[data-state="valid"]   { border-left-color: var(--a-clean); }
+.sb-wallet[data-state="invalid"] { border-left-color: var(--a-malicious); }
+.sb-wallet[data-state="pending"] { border-left-color: var(--a-low); }
+
+.sb-wallet__main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 190px) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.sb-wallet__address { font-size: 13px; }
+.sb-wallet__chain { font-size: 13px; padding: 8px 9px; }
+
+.sb-wallet__tag { margin-top: 2px; }
+.sb-wallet__tag .label { margin-top: 10px; }
+.sb-wallet__tag-input { max-width: 260px; font-size: 13px; }
+
+.sb-wallet__status {
+  margin: 7px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink-faint);
+  overflow-wrap: anywhere;
+}
+
+.sb-wallet__status:empty { display: none; }
+.sb-wallet__status.is-valid   { color: #bff3dc; }
+.sb-wallet__status.is-invalid { color: #ffc2cb; }
+.sb-wallet__status.is-pending { color: #cfe9ff; }
+
+.sb-cap {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: #ffe2a6;
+  border-left: 3px solid var(--a-suspicious);
+  padding-left: 8px;
+}
+
+/* --- Submit + results ------------------------------------------------------ */
+
+.sb-submit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid var(--a-line);
+}
+
+.sb-submit .hint { margin: 0; flex: 1 1 220px; }
+
+#sb-submit.is-busy { cursor: progress; }
+
+#sb-submit.is-busy::before {
+  content: "";
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 8px;
+  vertical-align: -1px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: sb-spin 0.8s linear infinite;
+}
+
+@keyframes sb-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  #sb-submit.is-busy::before { animation: none; }
+}
+
+.sb-result {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-top: 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--a-line-strong);
+  border-left-width: 4px;
+  border-radius: 4px;
+  background: rgba(6, 19, 43, 0.75);
+}
+
+.sb-result--ok   { border-left-color: var(--a-clean); }
+.sb-result--info { border-left-color: var(--a-low); }
+.sb-result--warn { border-left-color: var(--a-suspicious); }
+.sb-result--bad  { border-left-color: var(--a-malicious); background: rgba(74, 39, 35, 0.72); }
+
+.sb-result__body { flex: 1 1 auto; min-width: 0; }
+.sb-result__title { margin: 0; font-weight: 700; font-size: 14px; }
+.sb-result__line { margin: 6px 0 0; font-size: 13px; color: #cbdcf0; overflow-wrap: anywhere; }
+.sb-result__label { color: var(--ink-faint); }
+
+/* --- Analyzer status strip --------------------------------------------------- */
+
+.analyzer__title .sb-status {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--a-line);
+  border-left: 4px solid var(--a-line-strong);
+  border-radius: 4px;
+  background: rgba(6, 19, 43, 0.6);
+  max-width: 820px;
+}
+
+.analyzer__title .sb-status p {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 13.5px;
+  color: var(--paper);
+}
+
+.analyzer__title .sb-status .sb-status__detail {
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: #cbdcf0;
+}
+
+.sb-status--ok   { border-left-color: var(--a-clean) !important; }
+.sb-status--info { border-left-color: var(--a-low) !important; }
+.sb-status--warn { border-left-color: var(--a-suspicious) !important; }
+.sb-status--bad  { border-left-color: var(--a-malicious) !important; }
+.sb-status--busy { border-left-color: var(--a-low) !important; opacity: 0.85; }
+
+.analyzer__title .sb-status .panel__actions { margin-top: 8px; }
+
+@media (max-width: 560px) {
+  .sb-wallet__main { grid-template-columns: minmax(0, 1fr) auto; }
+  .sb-wallet__address { grid-column: 1 / -1; }
+  .sb-wallet__tag-input { max-width: none; }
+}

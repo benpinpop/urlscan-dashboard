@@ -48,6 +48,13 @@ URLScanAnalyzer.isOpen();                   // boolean
 |---|---|---|
 | `getKey` | `() => string` | Returns the current urlscan.io API key. Defaults to reading `#api-key`. |
 | `onPivot` | `(query) => void` | Called when the user clicks something that should become a search. |
+| `onReport` | `(siteUrl) => void` | Optional. Shows **Report to Scambusters**; called with the scan's URL. |
+| `checkSite` | `(siteUrl) => Promise<outcome>` | Optional. Shows **Check Scambusters**; the analyzer renders the outcome. |
+
+`onReport` and `checkSite` keep the analyzer ignorant of Scambusters: it only knows it has a site URL
+to hand over. `checkSite` resolves to a display model, `{ tone, title, detail, action }`, where `tone`
+is `ok | info | warn | bad` and `action` is an optional `{ label, run }` button. Leave either unset and
+its button stays hidden. `app.js` wires both to `ScambustersReporter` when that script is loaded.
 
 `getKey` is a callback rather than a field reference so the analyzer never owns the key or decides
 where it lives. Return an empty string when the server holds its own key
@@ -252,12 +259,82 @@ Point `KEYWORD_DB_PATH` and `DOMAIN_TABLE_PATH` elsewhere to keep your edits out
 
 ---
 
+## The Scambusters reporter
+
+`static/js/scambusters.js` owns the `#sb-panel` slide-over in `index.html` and exposes one global.
+It loads after `analyzer.js` and before `app.js`, so `app.js` can hand it to the analyzer:
+
+```html
+<script src="{{ url_for('static', filename='js/analyzer.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/scambusters.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+```
+
+```js
+ScambustersReporter.open({ siteUrl, focusKey });  // open, optionally prefilled / at the key editor
+ScambustersReporter.close();
+ScambustersReporter.isOpen();
+ScambustersReporter.hasKey();                     // a key is saved for this tab
+ScambustersReporter.describeCheck(siteUrl);       // Promise<{tone, title, detail, action}>, never rejects
+```
+
+The panel sits at `z-index: 75`, above the analyzer, so **Report** from the analyzer opens over it.
+Escape closes the reporter only (it listens in the capture phase and stops the event).
+
+### Wallet rules
+
+`wallet_validation/` is the ScamHunt CTF's validator. `codecs.py` is a byte-identical copy of
+`scamhunt-ctf/backend/scamhunt/validation/codecs.py`; `wallets.py` is a copy of `wallets.py` there
+with one addition, marked `XRP ADDITION` everywhere it appears: classic `r…` addresses (Base58Check
+over the XRP Ledger alphabet, version 0x00) and `validate_xrp_dest_tag()`. The browser never
+re-implements chain rules; it asks `/api/wallets/check` and only guesses the chain locally to
+pre-select the dropdown instantly (the same approach as the CTF's `submit.js`).
+
+When the CTF's rules change, copy both files again and re-apply the marked XRP blocks.
+`tests/test_wallet_validation.py` holds the CTF's own tests, so a bad copy fails there.
+
+### `POST /api/wallets/check`
+
+Request `{"address": "...", "chain": ""}`; an empty `chain` means "detect". No key needed.
+
+```json
+{
+  "detected": {"chain": "eth", "candidates": ["eth", "bsc", "matic", "arb", "avax", "op"], "note": "..."},
+  "chain": "eth", "chain_label": "Ethereum", "requires_tag": false,
+  "valid": true, "canonical": "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed",
+  "format": "EVM (EIP-55 checksum verified)", "error": ""
+}
+```
+
+`chain` is the requested chain when it is a known code, otherwise the detected one. `valid: false`
+with a `chain` means the address fails that chain's rules (including a hand-picked chain that doesn't
+fit); an empty `chain` means no supported format matched.
+
+### `POST /api/scambusters/submit` and `GET /api/scambusters/check?site_url=`
+
+Both take the key as `X-Scambusters-Key`. Unlike the urlscan routes, they return **Scambusters' own
+status and JSON body unchanged** (`{"errors": [...]}` for 400, `{"error": "..."}` otherwise), with
+`Retry-After` passed through on 429, so the browser handles exactly what the Scambusters docs
+describe. Errors raised here rather than upstream use the same shapes and add `"source": "local"`
+(bad or missing key, local validation, local rate limit) or `"source": "proxy"` (504 when Scambusters
+could not be reached within `SCAMBUSTERS_TIMEOUT`).
+
+The submit body is Scambusters' own format. The route re-validates it and forwards a rebuilt copy:
+canonical addresses (checksummed `0x…`, CashAddr for BCH), `xrp_dest_tag` only on XRP wallets and
+required there, and `wallets` omitted for a site-only report. Local 400s use Scambusters' field paths
+(`site_url …`, `wallets[3].xrp_dest_tag …`), so the panel maps local and upstream errors identically.
+
+---
+
 ## Working on it
 
 ```bash
 python3 tests/stub_server.py 8010     # whole dashboard against canned data, no key needed
-python3 -m unittest discover -s tests # 54 tests, no network
+python3 -m unittest discover -s tests # 103 tests, no network
 ```
+
+To exercise the reporter without a real key, point `SCAMBUSTERS_BASE_URL` at a local stand-in that
+answers `/api/submit` and `/api/check`; the stub server passes the environment straight through.
 
 The stub serves `tests/fixture_result.json` for every scan ID and a canned scam page for content
 analysis. The fixture is deliberately awkward — a failed request, a request with no response, a

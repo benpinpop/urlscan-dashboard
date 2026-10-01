@@ -7,6 +7,7 @@
 <title>Query Visualizer</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/analyzer.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/scambusters.css') }}">
 <link rel="icon" href="data:,">
 </head>
 <body>
@@ -15,6 +16,10 @@
   <div class="sheet-head__title">
     <h1>Query Visualizer</h1>
     <p>Visualize and analyze your search queries. Powered by URLScan.io</p>
+    <nav class="sheet-head__tools" aria-label="Tools">
+      <button type="button" id="sb-open" class="btn btn--small sb-open" aria-haspopup="dialog"
+              aria-controls="sb-panel">Report scam</button>
+    </nav>
   </div>
 
   <div class="key" id="key-panel">
@@ -228,6 +233,8 @@
     <span id="an-verdict-chip"></span>
     <a id="an-report" class="btn btn--ghost btn--small" target="_blank"
        rel="noopener noreferrer" hidden>urlscan.io report</a>
+    <button type="button" id="an-sb-check" class="btn btn--ghost btn--small" hidden>Check Scambusters</button>
+    <button type="button" id="an-sb-report" class="btn btn--small sb-open" hidden>Report to Scambusters</button>
   </div>
 
   <div class="loading" id="an-loading" hidden>
@@ -243,6 +250,7 @@
   <div class="analyzer__title" id="an-title" hidden>
     <h2 id="an-page-title"></h2>
     <p id="an-page-url"></p>
+    <div class="sb-status" id="an-sb-status" role="status" aria-live="polite" hidden></div>
   </div>
 
   <div class="analyzer__intro" id="an-intro">
@@ -262,8 +270,99 @@
   </div>
 </div>
 
+<!-- Scambusters reporter. Driven by static/js/scambusters.js; submissions go to
+     this app's /api/scambusters/* routes, which forward them with the user's key. -->
+<div class="panel sb" id="sb-panel" hidden>
+  <div class="panel__inner sb__inner" role="dialog" aria-modal="true" aria-labelledby="sb-title">
+    <div class="panel__bar">
+      <h3 id="sb-title">Report a scam site to Scambusters</h3>
+      <button type="button" id="sb-close" class="btn btn--ghost btn--small">Close</button>
+    </div>
+
+    <section class="panel__section sb-key" id="sb-key" aria-labelledby="sb-key-heading">
+      <h4 id="sb-key-heading">Scambusters API key</h4>
+      <div id="sb-key-edit">
+        <label class="sr-only" for="sb-key-input">Scambusters API key</label>
+        <div class="key__row">
+          <input type="password" id="sb-key-input" class="field key__input" autocomplete="off"
+                 spellcheck="false" placeholder="sb_your_key_here">
+          <button type="button" id="sb-key-save" class="btn btn--primary btn--small">Save</button>
+          <button type="button" id="sb-key-cancel" class="btn btn--ghost btn--small" hidden>Cancel</button>
+        </div>
+        <p class="sb-error" id="sb-key-error" hidden></p>
+      </div>
+      <div class="sb-key__saved" id="sb-key-saved" hidden>
+        <span class="sb-key__mask mono" id="sb-key-mask"></span>
+        <button type="button" id="sb-key-edit-btn" class="btn btn--ghost btn--small">Edit</button>
+        <button type="button" id="sb-key-clear" class="btn btn--ghost btn--small">Clear</button>
+      </div>
+      <p class="key__note">
+        Kept in this tab's sessionStorage only, so it is gone when the tab closes. It is sent to this
+        server with each report, forwarded to Scambusters as a request header, and never stored or logged here.
+      </p>
+    </section>
+
+    <div class="sb-result" id="sb-result" hidden>
+      <div class="sb-result__body" id="sb-result-body"></div>
+      <button type="button" class="alert__close" id="sb-result-close" aria-label="Dismiss">&times;</button>
+    </div>
+
+    <form class="panel__section sb-form" id="sb-form" novalidate data-max-wallets="{{ max_wallets }}">
+      <h4>Scam site</h4>
+      <label class="label" for="sb-site">Site URL <span class="sb-req">required</span></label>
+      <input type="text" id="sb-site" class="field mono" autocomplete="off" spellcheck="false"
+             inputmode="url" placeholder="scam-site.example — https:// is optional"
+             aria-describedby="sb-site-help sb-site-error">
+      <p class="hint" id="sb-site-help">Defanged links like <code>hxxps://evil[.]example</code> are converted automatically.</p>
+      <p class="sb-error" id="sb-site-error" hidden></p>
+
+      <fieldset class="sb-wallets">
+        <legend>Wallet addresses <span class="sb-opt">optional, up to {{ max_wallets }}</span></legend>
+        <p class="hint">The chain is detected from the address. <code>0x…</code> defaults to Ethereum; pick the
+          network the site actually uses. XRP addresses need their destination tag.</p>
+        <div class="sb-wallets__rows" id="sb-wallet-rows"></div>
+        <button type="button" id="sb-add-wallet" class="btn btn--ghost btn--small">+ Add another wallet</button>
+        <p class="sb-cap" id="sb-cap" role="alert" hidden>{{ max_wallets }} wallets is the most one report can hold.
+          Submit this one, then report the rest separately.</p>
+      </fieldset>
+
+      <div class="sb-submit">
+        <button type="submit" id="sb-submit" class="btn btn--primary" disabled>Submit to Scambusters</button>
+        <p class="hint" id="sb-submit-hint" aria-live="polite"></p>
+      </div>
+    </form>
+
+    <template id="sb-wallet-template">
+      <div class="sb-wallet" data-state="empty">
+        <div class="sb-wallet__main">
+          <input type="text" class="field mono sb-wallet__address" autocomplete="off" spellcheck="false"
+                 autocapitalize="off" placeholder="0x…  bc1…  T…  r…  addr1…" aria-label="Wallet address">
+          <select class="field sb-wallet__chain" aria-label="Blockchain">
+            <option value="">Detect automatically</option>
+            <optgroup label="EVM networks (same 0x address on each)">
+              {% for code, label in evm_chains %}<option value="{{ code }}">{{ label }}</option>{% endfor %}
+            </optgroup>
+            <optgroup label="Other chains">
+              {% for code, label in other_chains %}<option value="{{ code }}">{{ label }}</option>{% endfor %}
+            </optgroup>
+          </select>
+          <button type="button" class="btn btn--ghost btn--small sb-wallet__remove" aria-label="Remove this wallet">Remove</button>
+        </div>
+        <div class="sb-wallet__tag" hidden>
+          <label class="label">Destination tag (memo) <span class="sb-req">required for XRP</span></label>
+          <input type="text" class="field mono sb-wallet__tag-input" inputmode="numeric" autocomplete="off"
+                 placeholder="e.g. 104729 — shown next to the address on the site">
+          <p class="sb-error sb-wallet__tag-error" hidden></p>
+        </div>
+        <p class="sb-wallet__status" aria-live="polite"></p>
+      </div>
+    </template>
+  </div>
+</div>
+
 <script src="{{ url_for('static', filename='js/examples.js') }}"></script>
 <script src="{{ url_for('static', filename='js/analyzer.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/scambusters.js') }}" defer></script>
 <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
 </body>
 </html>
