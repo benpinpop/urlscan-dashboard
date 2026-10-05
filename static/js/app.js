@@ -21,6 +21,7 @@
     sort: document.getElementById("sort"),
     filter: document.getElementById("filter"),
     collapseDomain: document.getElementById("collapse-domain"),
+    toggleScambusters: document.getElementById("toggle-scambusters"),
     resolveDns: document.getElementById("resolve-dns"),
     toggleDetails: document.getElementById("toggle-details"),
     toggleDead: document.getElementById("toggle-dead"),
@@ -76,13 +77,15 @@
     return typeof n === "number" ? n.toLocaleString() : String(n);
   }
 
-  function showAlert(message) {
+  function showAlert(message, tone) {
     el.alertMsg.textContent = message;
+    el.alert.className = "alert" + (tone ? " alert--" + tone : "");
     el.alert.hidden = false;
   }
 
   function clearAlert() {
     el.alert.hidden = true;
+    el.alert.className = "alert";
     el.alertMsg.textContent = "";
   }
 
@@ -363,6 +366,37 @@
     } else {
       /* No scan ID means there is nothing for the analyzer to pull. */
       analyze.hidden = true;
+    }
+
+    var sbActions = node.querySelector(".frame__scambusters");
+    var sbCheck = node.querySelector(".frame__sb-check");
+    var sbReport = node.querySelector(".frame__sb-report");
+    var reporter = window.ScambustersReporter;
+    if (reporter && result.scanned_url && el.toggleScambusters.checked) {
+      sbActions.hidden = false;
+      sbCheck.addEventListener("click", function () {
+        sbCheck.disabled = true;
+        sbCheck.textContent = "Checking…";
+        reporter.describeCheck(result.scanned_url).then(function (outcome) {
+          var labels = { ok: "Unreported", warn: "Stale Wallets", bad: "Reported" };
+          ["ok", "warn", "bad"].forEach(function (tone) {
+            sbCheck.classList.remove("frame__sb-check--" + tone);
+          });
+          if (["ok", "warn", "bad"].indexOf(outcome.tone) !== -1) {
+            sbCheck.classList.add("frame__sb-check--" + outcome.tone);
+          }
+          sbCheck.textContent = outcome.label || labels[outcome.tone] || "Check ScamBusters";
+          sbCheck.title = outcome.title || "Scambusters check complete";
+          sbCheck.setAttribute("aria-label", outcome.title || "Scambusters check complete");
+        }).catch(function () {
+          sbCheck.textContent = "Check ScamBusters";
+        }).finally(function () {
+          sbCheck.disabled = true;
+        });
+      });
+      sbReport.addEventListener("click", function () {
+        reporter.open({ siteUrl: result.scanned_url });
+      });
     }
 
     node.dataset.haystack = [
@@ -738,6 +772,7 @@
   el.sort.addEventListener("change", render);
   el.filter.addEventListener("input", applyFilter);
   el.collapseDomain.addEventListener("change", render);
+  el.toggleScambusters.addEventListener("change", render);
   el.toggleDetails.addEventListener("click", function () {
     var minimal = el.sheet.classList.toggle("is-minimal");
     el.toggleDetails.textContent = minimal ? "Show details" : "Hide details";

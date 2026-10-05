@@ -114,6 +114,14 @@
       </span>
     </label>
 
+    <label class="knob knob--collapse" for="toggle-scambusters">
+      <span class="knob__label">ScamBusters utilities</span>
+      <span class="toggle">
+        <input type="checkbox" id="toggle-scambusters" checked>
+        <span>Show card buttons</span>
+      </span>
+    </label>
+
     <div class="knob knob--details">
       <span class="knob__label">Card details</span>
       <button type="button" id="toggle-details" class="btn btn--ghost btn--small"
@@ -207,6 +215,10 @@
         </div>
       </div>
       <button type="button" class="btn btn--ghost btn--small frame__analyze">Analyze result</button>
+      <div class="frame__scambusters" hidden>
+        <button type="button" class="btn btn--ghost btn--small frame__sb-check">Check ScamBusters</button>
+        <button type="button" class="btn btn--small frame__sb-report">Report</button>
+      </div>
       <dl class="facts">
         <div class="fact fact--ip"><dt>IP at scan</dt><dd class="mono"></dd></div>
         <div class="fact fact--status"><dt>Status</dt><dd class="mono"></dd></div>

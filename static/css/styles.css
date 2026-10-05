@@ -437,6 +437,21 @@ code {
   padding: 12px 14px;
 }
 
+.alert--ok {
+  background: #1f4036;
+  border-color: var(--ok);
+}
+
+.alert--warn {
+  background: #4a4023;
+  border-color: var(--warn);
+}
+
+.alert--info {
+  background: #233b4a;
+  border-color: var(--annot-bright);
+}
+
 .alert__msg { margin: 0; flex: 1; font-size: 14px; }
 
 .alert__close {
@@ -671,6 +686,78 @@ code {
 
 .frame__analyze:hover {
   background: linear-gradient(120deg, #0f59ac, #267ed0 62%, #27b6a7);
+  color: #fff;
+}
+
+.frame__scambusters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.frame__scambusters .btn {
+  min-width: 0;
+  padding-left: 6px;
+  padding-right: 6px;
+  font-size: 10px;
+  line-height: 1.1;
+  min-height: 30px;
+  white-space: normal;
+}
+
+.frame__scambusters .frame__sb-check {
+  background: transparent;
+  color: var(--ink-soft);
+  border-color: var(--paper-edge);
+}
+
+.frame__scambusters .frame__sb-check:hover {
+  background: #f4f7f5;
+  color: var(--ink);
+}
+
+.frame__scambusters .frame__sb-check--ok {
+  background: #2f8f68;
+  border-color: #2f8f68;
+  color: #fff;
+}
+
+.frame__scambusters .frame__sb-check--ok:hover {
+  background: #267653;
+  color: #fff;
+}
+
+.frame__scambusters .frame__sb-check--warn {
+  background: #c89521;
+  border-color: #c89521;
+  color: #fff;
+}
+
+.frame__scambusters .frame__sb-check--warn:hover {
+  background: #a97b16;
+  color: #fff;
+}
+
+.frame__scambusters .frame__sb-check--bad {
+  background: #c94c4c;
+  border-color: #c94c4c;
+  color: #fff;
+}
+
+.frame__scambusters .frame__sb-check--bad:hover {
+  background: #aa3c3c;
+  color: #fff;
+}
+
+.frame__sb-report {
+  background: #e76f51;
+  border-color: #e76f51;
+  color: #fff;
+}
+
+.frame__sb-report:hover {
+  background: #d85d40;
   color: #fff;
 }
 

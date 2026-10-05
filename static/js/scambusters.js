@@ -682,21 +682,21 @@ window.ScambustersReporter = (function () {
       var siteStatus = body.site_status && body.site_status !== "unknown" ? " Status: " + body.site_status + "." : "";
       if (body.has_wallets && body.stale) {
         return { tone: "warn", title: "Reported, but its wallets are over 30 days old.",
-          detail: "Latest wallet collected " + formatLocal(body.latest_wallet_collected_utc) + "." + siteStatus
+          label: "Stale Wallets", detail: "Latest wallet collected " + formatLocal(body.latest_wallet_collected_utc) + "." + siteStatus
             + " Scammers rotate wallets — fresh ones earn points. " + matched, action: reportAction };
       }
       if (body.has_wallets) {
-        return { tone: "ok", title: "Already reported — Scambusters has wallets for this site.",
-          detail: "Latest wallet collected " + formatLocal(body.latest_wallet_collected_utc) + "." + siteStatus + " " + matched,
+        return { tone: "bad", title: "Already reported — Scambusters has wallets for this site.",
+          label: "Reported", detail: "Latest wallet collected " + formatLocal(body.latest_wallet_collected_utc) + "." + siteStatus + " " + matched,
           action: reportAction };
       }
       if (body.is_reported === true || (body.site_status && body.site_status !== "unknown")) {
-        return { tone: "warn", title: "Reported, but no wallets collected yet.",
+        return { tone: "warn", title: "Reported, but no wallets collected yet.", label: "No Wallets",
           detail: "Site status: " + (body.site_status || "known") + ". Found its wallets? Report them. " + matched,
           action: reportAction };
       }
       if (body.is_reported === false || body.site_status === "unknown") {
-        return { tone: "info", title: "Not reported to Scambusters yet.", detail: matched, action: reportAction };
+        return { tone: "ok", title: "Not reported to Scambusters yet.", label: "Unreported", detail: matched, action: reportAction };
       }
       return { tone: "info", title: "Scambusters has no wallets recorded for this site.", detail: matched, action: reportAction };
     }
