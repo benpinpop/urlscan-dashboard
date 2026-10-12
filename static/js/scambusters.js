@@ -9,7 +9,7 @@
  * behaviour (instant format guess, debounced server check, "user chose a
  * chain" handling) is ported from the CTF's submit.js.
  *
- * The key lives in sessionStorage under "scambusters_api_key", is shown masked
+ * The key lives in localStorage under "scambusters_api_key", is shown masked
  * (sb_••••••••1234) and never appears in logs or messages beyond its last 4.
  *
  * Public surface, used by app.js and the analyzer:
@@ -34,8 +34,11 @@ window.ScambustersReporter = (function () {
   var el = {};
   var state = {
     ready: false,
-    memoryKey: "",          /* used only if sessionStorage is blocked */
+    memoryKey: "",          /* used only if localStorage is blocked */
     storageBlocked: false,
+    keyValid: false,
+    keyValidityListeners: [],
+    keyValidationToken: 0,
     editingKey: false,
     submitting: false,
     cooldownUntil: 0,
@@ -137,7 +140,7 @@ window.ScambustersReporter = (function () {
   function readKey() {
     if (state.storageBlocked) return state.memoryKey;
     try {
-      return window.sessionStorage.getItem(STORAGE_KEY) || "";
+      return window.localStorage.getItem(STORAGE_KEY) || "";
     } catch (e) {
       state.storageBlocked = true;
       return state.memoryKey;
@@ -148,9 +151,9 @@ window.ScambustersReporter = (function () {
     state.memoryKey = value || "";
     state.blockedInMemory = false;
     try {
-      if (value) window.sessionStorage.setItem(STORAGE_KEY, value);
-      else window.sessionStorage.removeItem(STORAGE_KEY);
-      window.sessionStorage.removeItem(BLOCKED_KEY);   /* a new key gets a fresh chance */
+      if (value) window.localStorage.setItem(STORAGE_KEY, value);
+      else window.localStorage.removeItem(STORAGE_KEY);
+      window.localStorage.removeItem(BLOCKED_KEY);   /* a new key gets a fresh chance */
     } catch (e) {
       state.storageBlocked = true;
     }
@@ -168,15 +171,61 @@ window.ScambustersReporter = (function () {
   }
 
   function submitBlocked() {
-    try { return window.sessionStorage.getItem(BLOCKED_KEY) === "1"; } catch (e) { return state.blockedInMemory === true; }
+    try { return window.localStorage.getItem(BLOCKED_KEY) === "1"; } catch (e) { return state.blockedInMemory === true; }
   }
 
   function setSubmitBlocked(blocked) {
     state.blockedInMemory = blocked;
     try {
-      if (blocked) window.sessionStorage.setItem(BLOCKED_KEY, "1");
-      else window.sessionStorage.removeItem(BLOCKED_KEY);
+      if (blocked) window.localStorage.setItem(BLOCKED_KEY, "1");
+      else window.localStorage.removeItem(BLOCKED_KEY);
     } catch (e) { /* memory flag above still applies */ }
+  }
+
+  function setKeyValidity(valid) {
+    state.keyValid = valid === true;
+    state.keyValidityListeners.forEach(function (listener) { listener(state.keyValid); });
+  }
+
+  function validateKey() {
+    var key = readKey();
+    var token = ++state.keyValidationToken;
+    if (!key) {
+      setKeyValidity(false);
+      return Promise.resolve(false);
+    }
+    el.keyError.textContent = "Validating…";
+    el.keyError.hidden = false;
+    return fetch("/api/scambusters/check?site_url=" + encodeURIComponent("https://google.com/"), {
+      headers: { Accept: "application/json", "X-Scambusters-Key": key },
+      cache: "no-store"
+    }).then(function (response) {
+      if (token !== state.keyValidationToken) return false;
+      if (response.status === 200) {
+        setKeyValidity(true);
+        el.keyError.textContent = "API key successfully set!";
+        el.keyError.hidden = false;
+        return true;
+      }
+      setKeyValidity(false);
+      if (response.status === 401) {
+        writeKey("");
+        state.editingKey = true;
+        el.keyError.textContent = "That Scambusters key was rejected. Check it and try again.";
+      } else {
+        el.keyError.textContent = "Scambusters key validation failed. Try again.";
+      }
+      el.keyError.hidden = false;
+      paintKey();
+      return false;
+    }).catch(function () {
+      if (token !== state.keyValidationToken) return false;
+      setKeyValidity(false);
+      el.keyError.textContent = "Could not validate the Scambusters key. Try again.";
+      el.keyError.hidden = false;
+      paintKey();
+      return false;
+    });
   }
 
   function paintKey() {
@@ -191,6 +240,8 @@ window.ScambustersReporter = (function () {
   }
 
   function editKey(focus) {
+    state.keyValidationToken += 1;
+    setKeyValidity(false);
     state.editingKey = true;
     el.keyInput.value = "";
     el.keyError.hidden = true;
@@ -211,11 +262,12 @@ window.ScambustersReporter = (function () {
     el.keyError.hidden = true;
     state.editingKey = false;
     if (state.storageBlocked) {
-      el.keyError.textContent = "This browser blocked session storage, so the key is kept only until you reload the page.";
+      el.keyError.textContent = "This browser blocked local storage, so the key is kept only until you reload the page.";
       el.keyError.hidden = false;
     }
     paintKey();
     el.site.focus();
+    validateKey();
   }
 
   /* --------------------------------------------------------------- rows */
@@ -647,6 +699,40 @@ window.ScambustersReporter = (function () {
     });
   }
 
+  function submitSiteOnly(siteUrl) {
+    var fixedUrl = refang(siteUrl);
+    if (!readKey()) {
+      open({ siteUrl: fixedUrl, focusKey: true });
+      return Promise.resolve({ ok: false, message: "Add your Scambusters API key first." });
+    }
+    if (!siteHostname(fixedUrl)) {
+      return Promise.resolve({ ok: false, message: "This scan has no valid site URL." });
+    }
+
+    var controller = window.AbortController ? new AbortController() : null;
+    var timer = setTimeout(function () { if (controller) controller.abort(); }, REQUEST_TIMEOUT_MS);
+    return fetch("/api/scambusters/submit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json", "X-Scambusters-Key": readKey() },
+      body: JSON.stringify({ site_url: fixedUrl }),
+      cache: "no-store",
+      signal: controller ? controller.signal : undefined
+    }).then(function (response) {
+      return response.json().catch(function () { return {}; }).then(function (body) {
+        var duplicate = response.ok && body.status === "duplicate";
+        var accepted = response.status === 201 || body.status === "queued" || duplicate;
+        return {
+          ok: accepted,
+          submissionId: body.submission_id || body.submission_key || "",
+          message: accepted ? "" : errorText(body, "Scambusters could not accept this report.")
+        };
+      });
+    }).catch(function (error) {
+      return { ok: false, message: error && error.name === "AbortError"
+        ? "Scambusters did not answer in time." : "The report request failed." };
+    }).finally(function () { clearTimeout(timer); });
+  }
+
   /* ------------------------------------------------------------- lookup */
 
   /* Used by the analyzer's "Check Scambusters" button. Resolves (never rejects)
@@ -824,12 +910,15 @@ window.ScambustersReporter = (function () {
     addRow();
     state.ready = true;
     paintKey();
+    if (readKey()) validateKey();
   }
 
   function init() {
     build();
     var opener = document.getElementById("sb-open");
     if (opener) opener.addEventListener("click", function () { open(); });
+    var keyOpener = document.getElementById("sb-key-open");
+    if (keyOpener) keyOpener.addEventListener("click", function () { open({ focusKey: true }); });
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
@@ -840,6 +929,13 @@ window.ScambustersReporter = (function () {
     close: close,
     isOpen: function () { return state.ready && !el.panel.hidden; },
     hasKey: function () { return !!readKey(); },
+    isKeyValid: function () { return state.keyValid; },
+    onKeyValidityChange: function (listener) {
+      if (typeof listener !== "function") return;
+      state.keyValidityListeners.push(listener);
+      listener(state.keyValid);
+    },
+    submitSiteOnly: submitSiteOnly,
     describeCheck: describeCheck,
     /* exposed for tests only */
     _siteHostname: siteHostname,

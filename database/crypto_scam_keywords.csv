@@ -122,15 +122,15 @@ investment plan,hyip_plan_structure,3
 choose a plan,hyip_plan_structure,3
 investment package,hyip_plan_structure,3
 investment tier,hyip_plan_structure,3
-starter plan,hyip_plan_structure,3
+starter plan,hyip_plan_structure,4
 starter package,hyip_plan_structure,3
-basic plan,hyip_plan_structure,2
-silver plan,hyip_plan_structure,3
-gold plan,hyip_plan_structure,3
-platinum plan,hyip_plan_structure,3
-diamond plan,hyip_plan_structure,3
-vip plan,hyip_plan_structure,3
-premium plan,hyip_plan_structure,2
+basic plan,hyip_plan_structure,4
+silver plan,hyip_plan_structure,4
+gold plan,hyip_plan_structure,4
+platinum plan,hyip_plan_structure,4
+diamond plan,hyip_plan_structure,4
+vip plan,hyip_plan_structure,4
+premium plan,hyip_plan_structure,4
 minimum deposit,hyip_plan_structure,2
 maximum deposit,hyip_plan_structure,2
 deposit plan,hyip_plan_structure,3
@@ -141,8 +141,8 @@ lock-in period,hyip_plan_structure,2
 daily cycle,hyip_plan_structure,3
 principal returned,hyip_plan_structure,3
 principal included,hyip_plan_structure,3
-after 24 hours,hyip_plan_structure,3
-after 7 days,hyip_plan_structure,2
+after 24 hours,hyip_plan_structure,4
+after 7 days,hyip_plan_structure,3
 plan duration,hyip_plan_structure,2
 reinvest,hyip_plan_structure,2
 reinvestment plan,hyip_plan_structure,3

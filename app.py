@@ -328,6 +328,7 @@ def index():
         sizes=Config.ALLOWED_SIZES,
         server_key_configured=bool(Config.URLSCAN_API_KEY),
         force_server_key=Config.FORCE_SERVER_KEY,
+        development_mode=Config.DEBUG,
         evm_chains=[(code, CHAINS[code]) for code in EVM_CHAINS],
         other_chains=[(code, CHAINS[code]) for code in OTHER_CHAINS],
         max_wallets=SCAMBUSTERS_MAX_WALLETS,

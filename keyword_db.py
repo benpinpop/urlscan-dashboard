@@ -38,15 +38,15 @@ OCCURRENCE_CAP = 5
 # deliberately worth nothing: those rows are topic vocabulary ("bitcoin",
 # "blockchain", "apy") and a page is not suspicious for being about crypto.
 # They are still counted and reported, as context.
-TIER_VALUE = {1: 0.0, 2: 0.2, 3: 0.5, 4: 1.0, 5: 1.25}
+TIER_VALUE = {1: 0.0, 2: 0.2, 3: 0.5, 4: 1.25, 5: 1.5}
 
 # Repeating a scoring keyword adds up to 40% of its value back.
 REPEAT_BONUS = 0.1
 REPEAT_BONUS_CAP = 4
 
-# Signal points that should read as "clearly bad". At 4.0 a page needs roughly
+# Signal points that should read as "clearly bad". At 2.2 a page needs roughly
 # four distinct severe claims, or a wider spread of weaker ones, to saturate.
-SIGNAL_MIDPOINT = 4.0
+SIGNAL_MIDPOINT = 2.2
 
 # Floor of the breadth multiplier. One category on its own is usually
 # vocabulary or a single unlucky phrase; fraud pages promise yields *and* press

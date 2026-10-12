@@ -18,7 +18,9 @@
     <p>Visualize and analyze your search queries. Powered by URLScan.io</p>
     <nav class="sheet-head__tools" aria-label="Tools">
       <button type="button" id="sb-open" class="btn btn--small sb-open" aria-haspopup="dialog"
-              aria-controls="sb-panel">Report scam</button>
+              aria-controls="sb-panel" hidden>Report scam</button>
+            <button type="button" id="sb-key-open" class="btn btn--ghost btn--small" aria-haspopup="dialog"
+              aria-controls="sb-panel">Set Scambusters key</button>
     </nav>
   </div>
 
@@ -73,6 +75,17 @@
           <span>Check live status</span>
         </span>
       </label>
+
+      <div class="knob knob--collapse" id="reported-sites-control" hidden>
+        <span class="knob__label">Reported sites</span>
+        <label class="btn btn--ghost btn--small csv-import" for="reported-sites-file">Import CSV</label>
+        <input type="file" id="reported-sites-file" accept=".csv,text/csv" hidden>
+        <span class="csv-import__status" id="reported-sites-status" aria-live="polite"></span>
+      </div>
+
+      <div class="query-pivot">
+        <button type="button" id="open-pivots" class="btn btn--primary btn--small">Pivot Library</button>
+      </div>
     </div>
 
     <div class="sort-tools">
@@ -114,7 +127,7 @@
       </span>
     </label>
 
-    <label class="knob knob--collapse" for="toggle-scambusters">
+    <label class="knob knob--collapse" id="scambusters-utility-control" for="toggle-scambusters" hidden>
       <span class="knob__label">ScamBusters utilities</span>
       <span class="toggle">
         <input type="checkbox" id="toggle-scambusters" checked>
@@ -132,6 +145,11 @@
       <span class="knob__label">DNS status</span>
       <button type="button" id="toggle-dead" class="btn btn--ghost btn--small"
               aria-pressed="false">Hide dead sites</button>
+    </div>
+    <div class="knob knob--details" id="reported-status-control" hidden>
+      <span class="knob__label">Reported status</span>
+      <button type="button" id="toggle-reported" class="btn btn--ghost btn--small"
+              aria-pressed="false">Hide reported sites</button>
     </div>
       <div class="knob knob--export">
         <span class="knob__label">Export</span>
@@ -173,7 +191,7 @@
 </div>
 
 <main>
-  <section class="empty" id="empty">
+  <section class="empty" id="empty" hidden>
     <h2>Pivots</h2>
     <ul class="empty__examples" id="example-list"></ul>
   </section>
@@ -185,6 +203,14 @@
     <p class="more__note" id="more-note"></p>
   </div>
 </main>
+
+<section class="analyzer pivots-view" id="pivots-view" hidden aria-label="Commonly Known Crypto Scam Pivots">
+  <div class="analyzer__bar">
+    <button type="button" id="pivots-back" class="btn btn--ghost btn--small">&larr; Back to search</button>
+    <h2 class="pivots-view__title">Commonly Known Crypto Scam Pivots</h2>
+  </div>
+  <ol class="pivots-list" id="pivots-list" aria-label="Commonly known crypto scam pivots"></ol>
+</section>
 
 <div class="lightbox" id="lightbox" hidden>
   <div class="lightbox__inner" role="dialog" aria-modal="true" aria-labelledby="lightbox-title">
@@ -212,12 +238,14 @@
         <div class="frame__signals">
           <span class="domain-age" aria-label="Domain age"></span>
           <span class="dns-status" aria-label="DNS status"></span>
+          <span class="report-status" aria-label="Report status" hidden></span>
         </div>
       </div>
       <button type="button" class="btn btn--ghost btn--small frame__analyze">Analyze result</button>
       <div class="frame__scambusters" hidden>
         <button type="button" class="btn btn--ghost btn--small frame__sb-check">Check ScamBusters</button>
         <button type="button" class="btn btn--small frame__sb-report">Report</button>
+        <button type="button" class="btn btn--small frame__sb-instant">Instant Report</button>
       </div>
       <dl class="facts">
         <div class="fact fact--ip"><dt>IP at scan</dt><dd class="mono"></dd></div>
@@ -247,6 +275,7 @@
        rel="noopener noreferrer" hidden>urlscan.io report</a>
     <button type="button" id="an-sb-check" class="btn btn--ghost btn--small" hidden>Check Scambusters</button>
     <button type="button" id="an-sb-report" class="btn btn--small sb-open" hidden>Report to Scambusters</button>
+    <button type="button" id="an-sb-add-key" class="btn btn--ghost btn--small an-sb-add-key" hidden>Add API key</button>
   </div>
 
   <div class="loading" id="an-loading" hidden>

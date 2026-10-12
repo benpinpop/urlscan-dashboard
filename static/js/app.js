@@ -9,6 +9,7 @@
   "use strict";
 
   var STORAGE_KEY = "urlscan-dashboard.apikey";
+  var REPORTED_SITES_STORAGE_KEY = "urlscan-dashboard.reported-sites";
 
   var el = {
     key: document.getElementById("api-key"),
@@ -22,9 +23,17 @@
     filter: document.getElementById("filter"),
     collapseDomain: document.getElementById("collapse-domain"),
     toggleScambusters: document.getElementById("toggle-scambusters"),
+    reportedSitesFile: document.getElementById("reported-sites-file"),
+    reportedSitesStatus: document.getElementById("reported-sites-status"),
+    reportedSitesControl: document.getElementById("reported-sites-control"),
+    reportedStatusControl: document.getElementById("reported-status-control"),
+    scambustersUtilityControl: document.getElementById("scambusters-utility-control"),
+    scambustersOpen: document.getElementById("sb-open"),
+    scambustersKeyOpen: document.getElementById("sb-key-open"),
     resolveDns: document.getElementById("resolve-dns"),
     toggleDetails: document.getElementById("toggle-details"),
     toggleDead: document.getElementById("toggle-dead"),
+    toggleReported: document.getElementById("toggle-reported"),
     dnsStatusControl: document.getElementById("dns-status-control"),
       toggleExport: document.getElementById("toggle-export"),
       exportMenu: document.getElementById("export-menu"),
@@ -53,7 +62,11 @@
     lightboxClose: document.getElementById("lightbox-close"),
     tpl: document.getElementById("frame-tpl"),
     exampleList: document.getElementById("example-list"),
-    openAnalyzer: document.getElementById("open-analyzer")
+    openAnalyzer: document.getElementById("open-analyzer"),
+    openPivots: document.getElementById("open-pivots"),
+    pivotsView: document.getElementById("pivots-view"),
+    pivotsBack: document.getElementById("pivots-back"),
+    pivotsList: document.getElementById("pivots-list")
   };
 
   var state = {
@@ -67,6 +80,7 @@
     dnsAvailable: false,
     searchMs: null,
     dnsMs: null,
+    reportedSites: null,
     busy: false,
     lastFocus: null
   };
@@ -132,6 +146,29 @@
     });
   }
 
+  function renderPivots() {
+    var examples = Array.isArray(window.URLSCAN_EXAMPLES) ? window.URLSCAN_EXAMPLES : [];
+    examples.forEach(function (pivot) {
+      var item = document.createElement("li");
+      var button = document.createElement("button");
+      button.type = "button";
+      button.className = "pivot-item";
+      button.textContent = pivot;
+      button.addEventListener("click", function () {
+        el.query.value = pivot;
+        closePivots();
+        runSearch(false);
+      });
+      item.appendChild(button);
+      el.pivotsList.appendChild(item);
+    });
+  }
+
+  function closePivots() {
+    el.pivotsView.hidden = true;
+    el.openPivots.focus();
+  }
+
   /* ------------------------------------------------------------- api key */
 
   function currentKey() {
@@ -167,6 +204,117 @@
       showAlert("This browser blocked local storage, so the key will not be kept between visits.");
       el.keyRemember.checked = false;
     }
+  }
+
+  function csvRows(text) {
+    var firstLine = text.split(/\r?\n/, 1)[0] || "";
+    if (firstLine.indexOf("\t") !== -1 && firstLine.indexOf(",") === -1) {
+      return text.split(/\r?\n/).filter(function (line) { return line.trim(); })
+        .map(function (line) { return line.split("\t"); });
+    }
+    var rows = [], row = [], field = "", quoted = false;
+    for (var i = 0; i < text.length; i += 1) {
+      var character = text[i];
+      if (character === '"') {
+        if (quoted && text[i + 1] === '"') { field += '"'; i += 1; }
+        else quoted = !quoted;
+      } else if (character === "," && !quoted) {
+        row.push(field); field = "";
+      } else if ((character === "\n" || character === "\r") && !quoted) {
+        if (character === "\r" && text[i + 1] === "\n") i += 1;
+        row.push(field); field = "";
+        if (row.some(function (value) { return value.trim(); })) rows.push(row);
+        row = [];
+      } else field += character;
+    }
+    row.push(field);
+    if (row.some(function (value) { return value.trim(); })) rows.push(row);
+    return rows;
+  }
+
+  function reportedSiteKey(value) {
+    var text = String(value || "").trim().replace(/^\uFEFF/, "");
+    if (!text) return "";
+    text = text.replace(/\s+/g, "");
+    text = text.replace(/^(https?)\/\//i, "$1://");
+    if (text.indexOf("//") === 0) text = "http:" + text;
+    if (!/^https?:\/\//i.test(text)) return "";
+    try {
+      var url = new URL(text.indexOf("://") === -1 ? "http://" + text : text);
+      if (!url.hostname || url.hostname.indexOf(".") === -1) return "";
+      return url.hostname.toLowerCase().replace(/^www\./, "");
+    } catch (e) {
+      return "";
+    }
+  }
+
+  function markReportedResults() {
+    if (!state.reportedSites) return;
+    state.results.forEach(function (result) {
+      result.csv_reported = state.reportedSites.has(reportedSiteKey(result.scanned_url || result.domain));
+    });
+  }
+
+  function persistReportedSites() {
+    try {
+      if (state.reportedSites) {
+        window.sessionStorage.setItem(REPORTED_SITES_STORAGE_KEY,
+          JSON.stringify(Array.from(state.reportedSites)));
+      } else {
+        window.sessionStorage.removeItem(REPORTED_SITES_STORAGE_KEY);
+      }
+    } catch (e) { /* session storage is optional */ }
+  }
+
+  function loadReportedSites() {
+    try {
+      var stored = JSON.parse(window.sessionStorage.getItem(REPORTED_SITES_STORAGE_KEY) || "null");
+      if (Array.isArray(stored) && stored.length) state.reportedSites = new Set(stored.filter(Boolean));
+    } catch (e) {
+      state.reportedSites = null;
+    }
+  }
+
+  function importReportedSites(event) {
+    if (!window.ScambustersReporter || !window.ScambustersReporter.isKeyValid()) return;
+    var file = event.target.files && event.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      var rows = csvRows(String(reader.result || ""));
+      var sites = new Set();
+      var start = rows.length && rows[0][0].replace(/^\uFEFF/, "").trim().toLowerCase() === "site_url_original" ? 1 : 0;
+      for (var rowIndex = start; rowIndex < rows.length; rowIndex += 1) {
+        var row = rows[rowIndex];
+        var value = row.join("");
+        var key = reportedSiteKey(value);
+        if (key) sites.add(key);
+      }
+      if (!sites.size) {
+        state.reportedSites = null;
+        persistReportedSites();
+        el.reportedStatusControl.hidden = true;
+        el.reportedSitesStatus.textContent = "No valid sites found";
+        el.toggleReported.setAttribute("aria-pressed", "false");
+        el.toggleReported.textContent = "Hide reported sites";
+        render();
+        return;
+      }
+      state.reportedSites = sites;
+      persistReportedSites();
+      markReportedResults();
+      el.reportedStatusControl.hidden = false;
+      el.reportedSitesStatus.textContent = sites.size + " sites";
+      render();
+    };
+    reader.onerror = function () {
+      state.reportedSites = null;
+      persistReportedSites();
+      el.reportedStatusControl.hidden = true;
+      el.reportedSitesStatus.textContent = "Could not read file";
+      render();
+    };
+    reader.readAsText(file);
   }
 
   /* -------------------------------------------------------------- request */
@@ -304,6 +452,7 @@
     var domain = node.querySelector(".frame__domain");
     var dnsStatus = node.querySelector(".dns-status");
     var domainAge = node.querySelector(".domain-age");
+    var reportStatus = node.querySelector(".report-status");
 
     node.querySelector(".frame__no").textContent = String(result.index).padStart(3, "0");
 
@@ -320,6 +469,11 @@
     }
 
     domain.textContent = result.domain || "Unknown domain";
+    if (state.reportedSites) {
+      reportStatus.hidden = false;
+      reportStatus.textContent = result.csv_reported ? "Reported" : "Unreported";
+      reportStatus.classList.add(result.csv_reported ? "report-status--reported" : "report-status--unreported");
+    }
     dnsStatus.hidden = !state.dnsAvailable;
     if (state.dnsAvailable) {
       dnsStatus.textContent = result.dns_status ? "Live" : "Dead";
@@ -371,8 +525,9 @@
     var sbActions = node.querySelector(".frame__scambusters");
     var sbCheck = node.querySelector(".frame__sb-check");
     var sbReport = node.querySelector(".frame__sb-report");
+    var sbInstant = node.querySelector(".frame__sb-instant");
     var reporter = window.ScambustersReporter;
-    if (reporter && result.scanned_url && el.toggleScambusters.checked) {
+    if (reporter && reporter.isKeyValid() && result.scanned_url && el.toggleScambusters.checked) {
       sbActions.hidden = false;
       sbCheck.addEventListener("click", function () {
         sbCheck.disabled = true;
@@ -396,6 +551,27 @@
       });
       sbReport.addEventListener("click", function () {
         reporter.open({ siteUrl: result.scanned_url });
+      });
+      sbInstant.addEventListener("click", function () {
+        sbInstant.disabled = true;
+        sbInstant.textContent = "Reporting…";
+        reporter.submitSiteOnly(result.scanned_url).then(function (outcome) {
+          if (outcome.ok) {
+            sbInstant.classList.add("frame__sb-instant--sent");
+            sbInstant.textContent = outcome.submissionId
+              ? "Reported: " + outcome.submissionId : "Reported";
+            sbInstant.title = outcome.submissionId
+              ? "Scambusters submission " + outcome.submissionId : "Reported to Scambusters";
+          } else {
+            sbInstant.disabled = false;
+            sbInstant.textContent = "Instant Report";
+            sbInstant.title = outcome.message || "The report could not be submitted";
+          }
+        }).catch(function () {
+          sbInstant.disabled = false;
+          sbInstant.textContent = "Instant Report";
+          sbInstant.title = "The report could not be submitted";
+        });
       });
     }
 
@@ -471,6 +647,9 @@
     if (state.dnsAvailable && el.toggleDead.getAttribute("aria-pressed") === "true") {
       displayResults = displayResults.filter(function (result) { return result.dns_status !== false; });
     }
+    if (state.reportedSites && el.toggleReported && el.toggleReported.getAttribute("aria-pressed") === "true") {
+      displayResults = displayResults.filter(function (result) { return !result.csv_reported; });
+    }
     var ordered = sortResults(displayResults);
     state.displayedCount = ordered.length;
     var fragment = document.createDocumentFragment();
@@ -479,7 +658,7 @@
     el.sheet.textContent = "";
     el.sheet.appendChild(fragment);
 
-    el.empty.hidden = state.results.length > 0;
+    el.empty.hidden = true;
     updateStatus();
     applyFilter();
   }
@@ -650,6 +829,7 @@
           state.results = incoming;
           window.scrollTo({ top: 0, behavior: "smooth" });
         }
+        markReportedResults();
 
         state.query = body.meta.query;
         state.size = body.meta.size;
@@ -768,11 +948,17 @@
   el.run.addEventListener("click", function () { runSearch(false); });
   el.loadMore.addEventListener("click", function () { runSearch(true); });
   el.quota.addEventListener("click", checkQuota);
+  el.openPivots.addEventListener("click", function () {
+    el.pivotsView.hidden = false;
+    el.pivotsView.scrollIntoView({ block: "start" });
+  });
+  el.pivotsBack.addEventListener("click", closePivots);
   el.alertClose.addEventListener("click", clearAlert);
   el.sort.addEventListener("change", render);
   el.filter.addEventListener("input", applyFilter);
   el.collapseDomain.addEventListener("change", render);
   el.toggleScambusters.addEventListener("change", render);
+  if (el.reportedSitesFile) el.reportedSitesFile.addEventListener("change", importReportedSites);
   el.toggleDetails.addEventListener("click", function () {
     var minimal = el.sheet.classList.toggle("is-minimal");
     el.toggleDetails.textContent = minimal ? "Show details" : "Hide details";
@@ -782,6 +968,12 @@
     var hiding = el.toggleDead.getAttribute("aria-pressed") !== "true";
     el.toggleDead.setAttribute("aria-pressed", String(hiding));
     el.toggleDead.textContent = hiding ? "Show dead sites" : "Hide dead sites";
+    render();
+  });
+  if (el.toggleReported) el.toggleReported.addEventListener("click", function () {
+    var hiding = el.toggleReported.getAttribute("aria-pressed") !== "true";
+    el.toggleReported.setAttribute("aria-pressed", String(hiding));
+    el.toggleReported.textContent = hiding ? "Show reported sites" : "Hide reported sites";
     render();
   });
   el.toggleExport.addEventListener("click", function () {
@@ -826,6 +1018,7 @@
   });
 
   renderExamples();
+  renderPivots();
   document.querySelectorAll(".example").forEach(function (button) {
     button.addEventListener("click", function () {
       el.query.value = button.dataset.q;
@@ -857,7 +1050,9 @@
         runSearch(false);
       },
       onReport: reporter ? function (siteUrl) { reporter.open({ siteUrl: siteUrl }); } : null,
-      checkSite: reporter ? reporter.describeCheck : null
+      checkSite: reporter ? reporter.describeCheck : null,
+      hasScambustersKey: reporter ? reporter.isKeyValid : null,
+      onAddScambustersKey: reporter ? function () { reporter.open({ focusKey: true }); } : null
     });
 
     el.openAnalyzer.addEventListener("click", function () {
@@ -872,6 +1067,29 @@
     el.openAnalyzer.hidden = true;
   }
 
+  var validityReporter = window.ScambustersReporter || null;
+  if (validityReporter && validityReporter.onKeyValidityChange) {
+    validityReporter.onKeyValidityChange(function (valid) {
+      if (el.scambustersUtilityControl) el.scambustersUtilityControl.hidden = !valid;
+      if (el.reportedSitesControl) el.reportedSitesControl.hidden = !valid;
+      if (el.reportedStatusControl) el.reportedStatusControl.hidden = !valid || !state.reportedSites;
+      if (el.scambustersOpen) el.scambustersOpen.hidden = !valid;
+      if (el.scambustersKeyOpen) el.scambustersKeyOpen.hidden = valid;
+      if (window.URLScanAnalyzer && window.URLScanAnalyzer.refreshScambusters) {
+        window.URLScanAnalyzer.refreshScambusters();
+      }
+      if (!valid) {
+        state.reportedSites = null;
+        persistReportedSites();
+        if (el.reportedSitesStatus) el.reportedSitesStatus.textContent = "";
+      } else if (state.reportedSites && el.reportedSitesStatus) {
+        el.reportedSitesStatus.textContent = state.reportedSites.size + " sites";
+      }
+      render();
+    });
+  }
+
+  loadReportedSites();
   loadStoredKey();
   syncDnsUi();
 })();

@@ -22,7 +22,7 @@ window.URLScanAnalyzer = (function () {
 
   /* onReport(siteUrl) and checkSite(siteUrl) -> Promise<{tone, title, detail, action}>
      are optional: without them the Scambusters buttons stay hidden. */
-  var hooks = { getKey: null, onPivot: null, onReport: null, checkSite: null };
+  var hooks = { getKey: null, onPivot: null, onReport: null, checkSite: null, hasScambustersKey: null, onAddScambustersKey: null };
 
   var state = {
     uuid: null,
@@ -1674,6 +1674,7 @@ window.URLScanAnalyzer = (function () {
     el.panelClose = document.getElementById("an-panel-close");
     el.sbCheck = document.getElementById("an-sb-check");
     el.sbReport = document.getElementById("an-sb-report");
+    el.sbAddKey = document.getElementById("an-sb-add-key");
     el.sbStatus = document.getElementById("an-sb-status");
 
     el.back.addEventListener("click", close);
@@ -1681,6 +1682,11 @@ window.URLScanAnalyzer = (function () {
     if (el.sbReport) {
       el.sbReport.addEventListener("click", function () {
         if (typeof hooks.onReport === "function" && state.data) hooks.onReport(scanSiteUrl(state.data.summary));
+      });
+    }
+    if (el.sbAddKey) {
+      el.sbAddKey.addEventListener("click", function () {
+        if (typeof hooks.onAddScambustersKey === "function") hooks.onAddScambustersKey();
       });
     }
     el.alertClose.addEventListener("click", clearError);
@@ -1831,8 +1837,10 @@ window.URLScanAnalyzer = (function () {
   function paintScambusters() {
     if (!el.sbCheck) return;
     var site = state.data ? scanSiteUrl(state.data.summary) : "";
-    el.sbCheck.hidden = !(typeof hooks.checkSite === "function" && site);
-    el.sbReport.hidden = !(typeof hooks.onReport === "function" && site);
+    var hasKey = typeof hooks.hasScambustersKey === "function" && hooks.hasScambustersKey();
+    el.sbCheck.hidden = !(hasKey && typeof hooks.checkSite === "function" && site);
+    el.sbReport.hidden = !(hasKey && typeof hooks.onReport === "function" && site);
+    el.sbAddKey.hidden = !(site && !hasKey && typeof hooks.onAddScambustersKey === "function");
     el.sbStatus.hidden = true;             /* a new scan starts with no stale lookup on screen */
     clear(el.sbStatus);
     state.sbToken = null;
@@ -1945,6 +1953,8 @@ window.URLScanAnalyzer = (function () {
     hooks.onPivot = options.onPivot || null;
     hooks.onReport = options.onReport || null;
     hooks.checkSite = options.checkSite || null;
+    hooks.hasScambustersKey = options.hasScambustersKey || null;
+    hooks.onAddScambustersKey = options.onAddScambustersKey || null;
     buildShell();
   }
 
@@ -1953,6 +1963,7 @@ window.URLScanAnalyzer = (function () {
     open: open,
     close: close,
     clearCache: clearCache,
+    refreshScambusters: paintScambusters,
     isOpen: function () { return state.ready && !el.root.hidden; }
   };
 })();
