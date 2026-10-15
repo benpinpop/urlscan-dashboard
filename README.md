@@ -1,14 +1,18 @@
-# Contact sheet — a urlscan.io search dashboard
+# URLScan Visualizer - Crypto Investment Scam Analyzer
 
-Search the [urlscan.io](https://urlscan.io) archive and read the results as a wall of screenshot
-frames. Each frame shows the domain, the IP that was actually contacted during that scan, the HTTP
-status, how the TLS certificate looked at the time, and when the scan ran.
+<img width="3765" height="1925" alt="image" src="https://github.com/user-attachments/assets/55ecbf55-90ba-4153-957a-1c223c142a0c" />
 
-Click **Analyze result** on any frame and a second dashboard opens over the sheet: the full scan
-record for that one result — every resource it fetched with their hashes, every domain it talked to,
-the security-engine verdicts, and a keyword risk score for the page's own text.
+The URLScan Visualizer targets crypto investment scam analysis, particularly pivoting. The visualizer includes support for reducing duplicates and live DNS lookup, something that URLScan doesn't natively support.
 
-Python backend (Flask), plain HTML/CSS/JS frontend, no build step.
+<img width="3720" height="1737" alt="image" src="https://github.com/user-attachments/assets/090d41b3-3fd0-4926-84a3-c04ce1c169c3" />
+
+Analysis features include content analysis, automated contact domain recognition, and filtering file names by Apex Domain:
+
+**Content Analysis**
+<img width="3565" height="1722" alt="image" src="https://github.com/user-attachments/assets/edb42125-b2f2-42e6-9d64-a1002af6c8ae" />
+
+**Domain Recognition**
+<img width="3477" height="1740" alt="image" src="https://github.com/user-attachments/assets/32346b5d-96fc-4bdd-be2b-6460b77c000b" />
 
 ---
 
