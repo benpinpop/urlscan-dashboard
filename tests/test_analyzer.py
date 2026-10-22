@@ -15,7 +15,14 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from domain_intel import DomainTable, registrable_domain  # noqa: E402
-from keyword_db import KeywordDatabase, band_for, extract_text  # noqa: E402
+from keyword_db import (  # noqa: E402
+    REPEAT_BONUS,
+    REPEAT_BONUS_CAP,
+    TIER_VALUE,
+    KeywordDatabase,
+    band_for,
+    extract_text,
+)
 from result_shaper import shape_files, shape_result, shape_verdicts, summarise  # noqa: E402
 
 FIXTURE = json.loads((ROOT / "tests" / "fixture_result.json").read_text(encoding="utf-8"))
@@ -120,7 +127,8 @@ class Scoring(unittest.TestCase):
         many = self.db.score_text(("guaranteed profit " * 40) + ("filler " * 200))
         self.assertGreater(many["score"], once["score"])
         # One keyword, repeated: worth its tier value plus at most 40% again.
-        self.assertLessEqual(many["signal_points"], 1.25 * 1.4 + 0.001)
+        ceiling = TIER_VALUE[5] * (1 + REPEAT_BONUS * REPEAT_BONUS_CAP)
+        self.assertLessEqual(many["signal_points"], ceiling + 0.001)
 
     def test_score_ignores_page_length(self):
         claim = "Earn 3% daily, guaranteed profit, risk-free. Pay the withdrawal fee to release."

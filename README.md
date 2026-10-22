@@ -20,10 +20,12 @@ Analysis features include content analysis, automated contact domain recognition
 
 The browser sends urlscan requests to this app, which forwards them with the `API-Key` request header
 and returns a trimmed JSON payload. DOM extraction and keyword scoring run in the browser. Optional
-live DNS status uses Cloudflare DNS-over-HTTPS and never sends the urlscan key. That means:
+live DNS status is looked up from the browser through Cloudflare DNS-over-HTTPS and never sends the
+urlscan key. That means:
 
 - the key is never in a URL, so it cannot leak through proxy logs, browser history or `Referer`
-- the browser only ever fetches same-origin, so the Content-Security-Policy can stay strict
+- the browser only fetches same-origin (plus Cloudflare DNS when live status is on), so the
+  Content-Security-Policy can stay strict
 - rate limiting and input validation happen somewhere a user cannot bypass
 
 ### Notes on the data
@@ -60,7 +62,8 @@ cd urlscan-dashboard
 Open <http://127.0.0.1:8000>, paste your key into the field at the top right, and search.
 
 `run.sh` creates a virtualenv, installs dependencies, copies `.env.example` to `.env` on first run,
-and starts gunicorn.
+and starts gunicorn. Note that `.env.example` sets `HOST=0.0.0.0`; change it to `127.0.0.1` if the
+machine is reachable from networks you do not trust.
 
 ### Manual setup
 
@@ -101,8 +104,10 @@ All settings are environment variables; `.env` is read automatically if `python-
 | `RESULT_CACHE_MAX_ENTRIES` | `64` | Cached results per worker. |
 | `KEYWORD_DB_PATH` | `database/crypto_scam_keywords.csv` | Risk keyword database. |
 | `DOMAIN_TABLE_PATH` | `database/domain_categories.csv` | Third-party domain classification table. |
+| `QUERY_TERMS_PATH` | `database/query_terms.csv` | urlscan search fields offered by the query bar's autocomplete. |
 | `URLSCAN_SITE_URL` | `https://urlscan.io` | Where stored DOMs are fetched from. |
-| `WEB_CONCURRENCY` / `WEB_THREADS` | `4` / `4` | Gunicorn workers and threads. |
+| `WEB_CONCURRENCY` / `WEB_THREADS` | CPU count, max `4` / `4` | Gunicorn workers and threads. |
+| `LOG_LEVEL` | `info` | Gunicorn log level. |
 | `SCAMBUSTERS_BASE_URL` | `https://scambuster.intelligenceforgood.org` | Where reports and lookups are forwarded. |
 | `SCAMBUSTERS_TIMEOUT` | `20` | Seconds to wait on Scambusters. |
 | `SCAMBUSTERS_RATE_LIMIT_PER_MINUTE` | `120` | This server's backstop per client address for reporter calls. |
@@ -190,14 +195,63 @@ publishes only on `127.0.0.1:8000` — put nginx in front of it the same way.
 
 Full field list: <https://urlscan.io/docs/search/>
 
+**Autocomplete.** Start typing a field name in the query box and a list of matching urlscan fields
+opens under it, each with its type, a one-line description and an example query. Fields that need a
+urlscan Pro plan carry a yellow **PRO** badge, and fields that take `/regex/` values say so. Matching
+is case-insensitive: prefixes first (`dom` → `domain`), then dotted segments (`keyword` →
+`domain.keyword`), then anything containing what you typed, with free fields ahead of Pro ones. It
+only completes the field name under the cursor, so `page.domain:x AND co` completes `co` and leaves
+the rest alone, and it stays out of the way inside a value, a quoted phrase, a `/regex/` or a range.
+Up/Down move through the list, Tab (or Enter on a highlighted row, or a click) inserts `field:`,
+Shift+Enter or clicking a row's example inserts the whole example, and Esc closes it. Plain Enter
+with nothing highlighted still searches. The list comes from `database/query_terms.csv` (114 fields,
+65 free and 49 Pro); edit it to add fields. If the file is missing the box works exactly as before, just without suggestions.
+
 **Results per page** goes up to 10,000, urlscan's hard ceiling for one request. Large sizes pull a lot
 of screenshots, so start at 100 and work up.
 
 **Frames per row** switches between 4, 6 and 10 columns. At 10 the field labels drop away and the
 frames tighten up for fast scanning; the layout collapses further on narrow screens regardless.
 
+**Pivot Library** opens a list of commonly known crypto-scam pivots (shared chat widgets and price
+tickers, kit filenames, known hashes, `task.tags:cryptoscam`); click one to run it. The same list is
+shown as a starting point while the sheet is empty. It lives in `static/js/examples.js`; add your own.
+
 **Order** and **Filter these results** both work on the frames already loaded, client-side, with no
-extra API calls. To sort across the whole result set instead, put the constraint in the query.
+extra API calls. Order covers scan time, domain, domain age, IP, country, HTTP status and certificate
+days left. To sort across the whole result set instead, put the constraint in the query.
+
+**Reduce duplicates** keeps only the latest scan of each domain (`www.` ignored), which urlscan cannot
+do for you. **Hide details** drops the IP, status, certificate and scan-time rows from every frame.
+
+**Domain age** on each frame is the age urlscan recorded at scan time, not today's age.
+
+**Check live status** resolves every loaded domain's A record from your browser through Cloudflare
+DNS-over-HTTPS and marks each frame live or dead; **Hide dead sites** then drops the dead ones. Only
+domain names go to Cloudflare, never the key.
+
+**Export sites** downloads the loaded sites as `.txt` (one domain per line) or `.csv` (domain, IP at
+scan, scan time, urlscan report URL, plus DNS status and live IP when live status is on). It can drop
+duplicate domains and, with live status on, include only dead or only live sites. Once a
+reported-sites CSV is imported, the menu also offers **Include reported sites** and **Include
+unreported sites** (both ticked by default), decided exactly as the frame's Reported / Unreported badge
+is, and the `.csv` gains a trailing *Report status* column. Export always covers every loaded site,
+not just the frames on screen, so **Hide reported sites**, **Hide dead sites**, **Latest scan per
+domain** and the filter box do not change what is exported; use the menu's own options. If the
+choices leave nothing to export, no file is downloaded and a message says why.
+
+**With a Scambusters key saved** (see [Reporting to Scambusters](#reporting-to-scambusters)) the
+console gains three more controls:
+
+- **ScamBusters utilities: Show card buttons** puts **Check ScamBusters**, **Report** and **Instant
+  Report** on every frame. Check looks the site up and relabels the button *Unreported*, *Stale
+  Wallets* or *Reported*. Report opens the reporter with the site filled in. Instant Report submits the
+  site on its own, no wallets, in one click and shows the submission ID.
+- **Reported sites: Import CSV** loads a list of sites you have already reported (one URL per
+  row with its `http(s)://` scheme; a `site_url_original` header row is skipped). Frames are then badged
+  *Reported* or *Unreported*, matched by hostname with `www.` ignored. The list is kept in this tab's
+  `sessionStorage` and dropped when the key is cleared or rejected.
+- **Hide reported sites** appears once a list is loaded and takes those frames off the sheet.
 
 **Check quota** reads `/api/v1/quotas` and reports how many searches your key has left this minute,
 hour and day. urlscan meters each action type separately, so a search quota and a scan-submission
@@ -267,7 +321,7 @@ Corpus prevalence is shown as what it is: a count, not a verdict.
 ### Domains and connections
 
 Every domain the page contacted, ranked by request count, with type, country, network and bytes.
-Types come from `database/domain_categories.csv`, a local table of about 180 patterns covering
+Types come from `database/domain_categories.csv`, a local table of about 200 patterns covering
 analytics, advertising, trackers, CDNs, fonts, CAPTCHA, social, live chat, payments, crypto services,
 site platforms and hosting. It is a plain CSV; add your own rows.
 
@@ -296,7 +350,7 @@ most scans are never reviewed by anything.
 ## Content analysis and risk scoring
 
 **Analyze page content** fetches the DOM urlscan stored for the scan, strips scripts, styles and
-markup, and scores the visible text against `database/crypto_scam_keywords.csv` — 507 keywords in 22
+markup, and scores the visible text against `database/crypto_scam_keywords.csv` — 529 keywords in 22
 categories, each with a weight from 1 to 5.
 
 Matching is case-insensitive and boundary-aware. `pass` does not match inside `password`, and phrases
@@ -308,7 +362,7 @@ matches however the page typed it.
 
 ```
 points = Σ over distinct keywords of  tier_value(weight) × repeat_bonus
-score  = 100 × (1 − e^(−points / 4)) × breadth
+score  = 100 × (1 − e^(−points / 2.2)) × breadth
 ```
 
 | Weight | Meaning | Contributes |
@@ -316,8 +370,8 @@ score  = 100 × (1 − e^(−points / 4)) × breadth
 | 1 | topic vocabulary — `bitcoin`, `blockchain`, `apy` | **nothing** |
 | 2 | low | 0.2 |
 | 3 | moderate | 0.5 |
-| 4 | high | 1.0 |
-| 5 | severe | 1.25 |
+| 4 | high | 1.25 |
+| 5 | severe | 1.5 |
 
 Four decisions worth knowing about, because they are what make the number usable:
 
@@ -339,16 +393,15 @@ urgency *and* fabricates endorsements. One category on its own is usually vocabu
 
 ### What the numbers look like
 
-Measured against the shipped database:
+Measured against the shipped database, using the sample pages in `tests/test_analyzer.py`:
 
 | Page | Score | Band |
 |---|---|---|
-| Retail bank homepage | 0 | minimal |
-| Neutral article about crypto staking | 8 | minimal |
-| Mild cloud-mining marketing | 12 | minimal |
-| Regulated exchange homepage (mentions seed phrases, staking rewards) | 19 | low |
-| Short HYIP pitch | 90 | high |
-| Full fake cloud-mining site | 100 | high |
+| Invoicing software homepage | 0 | minimal |
+| Crypto vocabulary only ("we support bitcoin, ethereum, USDT…") | 0 | minimal |
+| Regulated exchange blurb (mentions seed phrases, staking rewards, APY) | 35 | low |
+| One-line pitch: "Earn 3% daily, guaranteed profit, risk-free…" | 76 | high |
+| Full fake cloud-mining page | 99.5 | high |
 
 Bands: minimal under 15, low 15–39, elevated 40–69, high 70+.
 
@@ -379,18 +432,23 @@ Every response carries that caveat, and the UI prints it under every score.
 
 ## Reporting to Scambusters
 
-**Report scam** in the header opens a reporter panel that submits a scam site, plus the wallet
-addresses it shows, to [Scambusters](https://scambuster.intelligenceforgood.org). The result analyzer
-gets two buttons for the scan you are looking at: **Check Scambusters** (is this site already known,
-and are its wallets fresh?) and **Report to Scambusters** (opens the reporter with the site filled in).
+**Set Scambusters key** in the header opens the reporter panel. Once a key is saved and accepted, the
+button becomes **Report scam**, which submits a scam site, plus the wallet addresses it shows, to
+[Scambusters](https://scambuster.intelligenceforgood.org). The result analyzer gets two buttons for the
+scan you are looking at: **Check Scambusters** (is this site already known, and are its wallets
+fresh?) and **Report to Scambusters** (opens the reporter with the site filled in); without a key it
+offers **Add API key** instead. The frame buttons, reported-sites import and Instant Report described
+under [Using it](#using-it) also need the key.
 
 ### Your key
 
-Paste your Scambusters key (`sb_…`, from `/get-api-key` in Discord) at the top of the panel. It is
-kept in this tab's `sessionStorage` under `scambusters_api_key`, so it is gone when the tab closes, and
-it is shown masked as `sb_••••••••1234` with **Edit** and **Clear**. The key travels to this server as
-the `X-Scambusters-Key` header on each request and is forwarded as `Authorization: Bearer`. It is
-never stored or logged server-side, and messages never show more than its last four characters.
+Paste your Scambusters key (`sb_…`, from `/get-api-key` in Discord) at the top of the panel. Saving
+it runs one Scambusters lookup to prove it works; a rejected key is cleared and the editor reopens.
+It is kept in this browser's `localStorage` under `scambusters_api_key`, so it survives a reload, and
+it is shown masked as `sb_••••••••1234` with **Edit** and **Clear**. Use **Clear** on a shared
+machine. The key travels to this server as the `X-Scambusters-Key` header on each request and is
+forwarded as `Authorization: Bearer`. It is never stored or logged server-side, and messages never
+show more than its last four characters.
 
 ### The form
 
@@ -446,11 +504,14 @@ Fixture-driven, no network and no API key:
 python3 -m unittest discover -s tests -v
 ```
 
+`tests/fixture_result.json` is the canned scan result they share.
 `tests/test_analyzer.py` covers text extraction, scoring behaviour and calibration, domain
 classification and result shaping — including a deliberately awkward fixture with a failed request, a
 request with no response at all, a malformed hash and a download with three digests.
 `tests/test_routes.py` covers the endpoints with urlscan.io stubbed out: validation, error mapping,
 per-key caching and rate limiting.
+`tests/test_query_terms.py` covers the autocomplete's field list: quoted CSV examples, bad and
+duplicate rows, and a missing or malformed file.
 `tests/test_wallet_validation.py` carries the ScamHunt CTF's own wallet and codec tests (published
 checksum vectors for every format), plus the XRP additions.
 `tests/test_scambusters.py` covers the reporter routes with Scambusters stubbed out: the wallet-check
@@ -472,7 +533,8 @@ That serves the whole dashboard against canned data. Any key-shaped string is ac
   drops query strings, and a scrubbing filter masks anything UUID-shaped that reaches a log line.
 - Responses under `/api/` are sent `Cache-Control: no-store` so a shared proxy cannot serve one
   analyst's results to another.
-- CSP allows scripts and styles from this origin only, and images from this origin plus urlscan.io.
+- CSP allows scripts and styles from this origin only, images from this origin plus urlscan.io, and
+  network requests to this origin plus `cloudflare-dns.com` (the live DNS check).
   There is no inline JavaScript anywhere, so the policy needs no `unsafe-inline` escape hatch.
 - Queries, page sizes and pagination cursors are validated server-side; the browser's checks are a
   convenience, not the control.
@@ -494,12 +556,13 @@ For the analyzer specifically:
 - **Cached results are scoped to a digest of the key that fetched them**, so two analysts sharing one
   instance cannot read each other's private scans out of the cache. Switching or forgetting the key
   clears the browser-side cache too.
-- **Content analysis has its own rate limit** on top of the shared one, because it fetches and parses
-  a whole document per call.
+- **Content analysis does its parsing in the browser.** The server only fetches the stored DOM
+  (rate-limited like a search) and hands it over; extraction and scoring never run server-side.
 
 For the Scambusters reporter:
 
-- **The Scambusters key is per tab and per request.** It lives in `sessionStorage`, is sent only as
+- **The Scambusters key stays in the browser.** It lives in `localStorage` (readable by script on
+  this page, like the urlscan "keep" option below; **Clear** removes it), is sent only as
   a request header to this origin, is forwarded only as `Authorization: Bearer`, and is masked by the
   log scrubber like urlscan keys. No response echoes it.
 - **Reports are re-validated server-side** with the same wallet rules the form uses, so a modified
@@ -520,13 +583,15 @@ off — "Forget" clears both the field and the stored copy.
 | Endpoint | Purpose |
 |---|---|
 | `GET /` | The dashboard |
+| `GET /favicon.ico` | Empty `204`, so browsers stop asking |
 | `GET /api/health` | Liveness check |
-| `GET /api/config` | Allowed page sizes and whether a server key is configured |
+| `GET /api/config` | Allowed page sizes, whether a server key is configured, analyzer database sizes |
 | `GET /api/search?q=&size=&search_after=` | Proxied search |
 | `GET /api/quotas` | Remaining search quota for the key |
 | `GET /api/result/<uuid>` | Full scan result, flattened into summary / files / domains / verdicts |
 | `GET /api/dom/<uuid>` | Fetches the stored DOM for browser-side extraction and scoring |
 | `GET /api/keywords` | What is in the keyword database, by category |
+| `GET /api/query-terms` | urlscan search fields for the query autocomplete (no key needed) |
 | `POST /api/wallets/check` | Detects and validates one wallet address (the reporter's live check) |
 | `POST /api/scambusters/submit` | Re-validates a report and forwards it to Scambusters |
 | `GET /api/scambusters/check?site_url=` | Forwards a Scambusters lookup for one site |
@@ -552,20 +617,29 @@ config.py              Environment configuration
 urlscan_client.py      urlscan.io client, error types, search-result flattening
 result_shaper.py       Turns one result document into the analyzer's payload
 keyword_db.py          Keyword database, HTML-to-text, risk scoring
+query_terms.py         urlscan search-field list behind the query autocomplete
 domain_intel.py        Third-party domain classification
 rate_limit.py          In-memory sliding-window limiter
 scambusters.py         Scambusters pass-through client and report validation
 wallet_validation/     Wallet chain detection + checksums, ported from the ScamHunt CTF (+ XRP)
 wsgi.py                Gunicorn entrypoint
+gunicorn.conf.py       Gunicorn bind, workers, threads and logging
+run.sh                 One-command setup and start
+requirements.txt       Python dependencies
+.env.example           Configuration template, copied to .env
+Dockerfile, docker-compose.yml  Container build and local-only compose service
 templates/index.html   Markup for both dashboards and the reporter
 static/css/styles.css  Contact sheet styles
 static/css/analyzer.css  Analyzer styles
 static/css/scambusters.css  Reporter styles
-static/js/app.js       Search, sorting, filtering, pagination, lightbox
+static/js/app.js       Search, sorting, filtering, pagination, lightbox, live DNS, export, reported sites
+static/js/examples.js  The Pivot Library queries
+static/js/autocomplete.js  Field-name autocomplete for the query box
 static/js/analyzer.js  The result analyzer
 static/js/scambusters.js  The Scambusters reporter
-database/              Keyword database and domain classification table (both CSV, both editable)
+database/              Keyword database, domain classification table and query-field list (all CSV, all editable)
 tests/                 Fixture-driven tests and a stub server for UI work
 deploy/                systemd unit and nginx example
 INTEGRATION.md         How the two dashboards connect, and the endpoint contracts
+CHANGELOG.md           What changed, feature by feature
 ```

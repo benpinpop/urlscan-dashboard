@@ -27,7 +27,7 @@
   <div class="key" id="key-panel">
     <label class="key__label" for="api-key">urlscan.io API key</label>
     <div class="key__row">
-      <input type="password" id="api-key" class="key__input" autocomplete="off" spellcheck="false"
+      <input type="password" id="api-key" class="field key__input" autocomplete="off" spellcheck="false"
              placeholder="Paste your key from urlscan.io/user/profile">
       <button type="button" id="key-reveal" class="btn btn--ghost" aria-pressed="false">Show</button>
       <button type="button" id="key-forget" class="btn btn--ghost">Forget</button>
@@ -47,8 +47,18 @@
 <section class="console" aria-label="Search controls">
   <div class="console__query">
     <div class="query-row">
-      <input type="search" id="query" class="field field--query" spellcheck="false"
-             placeholder="page.domain:example.com" value="">
+      <!-- Field-name autocomplete is driven by static/js/autocomplete.js; the list
+           comes from /api/query-terms. Without it this is a plain search box. -->
+      <div class="query-box" id="query-box">
+        <input type="search" id="query" class="field field--query" spellcheck="false"
+               autocomplete="off" aria-label="urlscan search query"
+               placeholder="page.domain:example.com" value="">
+        <div class="qac" id="query-suggest" hidden>
+          <ul class="qac__list" id="query-suggest-list" role="listbox" aria-label="Search fields"></ul>
+          <p class="qac__hint" aria-hidden="true">Up/Down navigate · Tab complete · Shift+Enter or click an example to insert it · Esc close</p>
+        </div>
+        <p class="sr-only" id="query-suggest-status" aria-live="polite"></p>
+      </div>
       <button type="button" id="run" class="btn btn--primary">Search</button>
     </div>
     <p class="hint">
@@ -160,6 +170,12 @@
             <legend>Include</legend>
             <label><input type="checkbox" id="export-dead" checked> Dead sites</label>
             <label><input type="checkbox" id="export-live" checked> Live sites</label>
+          </fieldset>
+          <!-- Shown by app.js:syncReportedExportUi only while a reported-sites CSV is imported. -->
+          <fieldset id="export-report-filters" hidden>
+            <legend>Report status</legend>
+            <label><input type="checkbox" id="export-reported" checked> Include reported sites</label>
+            <label><input type="checkbox" id="export-unreported" checked> Include unreported sites</label>
           </fieldset>
           <label class="export-dedupe"><input type="checkbox" id="export-dedupe"> Remove duplicate domains</label>
           <label class="export-menu__type" for="export-type">File type</label>
@@ -402,6 +418,7 @@
 </div>
 
 <script src="{{ url_for('static', filename='js/examples.js') }}"></script>
+<script src="{{ url_for('static', filename='js/autocomplete.js') }}" defer></script>
 <script src="{{ url_for('static', filename='js/analyzer.js') }}" defer></script>
 <script src="{{ url_for('static', filename='js/scambusters.js') }}" defer></script>
 <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>

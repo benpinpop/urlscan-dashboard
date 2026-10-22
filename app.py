@@ -27,6 +27,7 @@ except ImportError:  # pragma: no cover
 from config import Config
 from domain_intel import DomainTable
 from keyword_db import KeywordDatabase
+from query_terms import QueryTerms
 from rate_limit import RateLimiter
 from result_shaper import shape_result
 from scambusters import (
@@ -115,6 +116,18 @@ DOMAIN_TABLE = (
     if Config.DOMAIN_TABLE_PATH
     else DomainTable.load()
 )
+
+# The query-bar autocomplete is a convenience. Without it the search box works
+# exactly as before, so a missing or broken file is logged and nothing more.
+QUERY_TERMS: QueryTerms | None = None
+try:
+    QUERY_TERMS = (
+        QueryTerms.load(Config.QUERY_TERMS_PATH)
+        if Config.QUERY_TERMS_PATH
+        else QueryTerms.load()
+    )
+except Exception as exc:  # pragma: no cover - configuration problem
+    log.error("query term list unavailable: %s: %s", type(exc).__name__, exc)
 
 # urlscan keys are UUIDs, but accept anything key-shaped so a future format
 # change does not brick the dashboard.
@@ -274,6 +287,7 @@ REQUIRED_ASSETS = (
     "static/css/analyzer.css",
     "static/css/scambusters.css",
     "static/js/app.js",
+    "static/js/autocomplete.js",
     "static/js/analyzer.js",
     "static/js/scambusters.js",
 )
@@ -561,6 +575,21 @@ def keywords():
             "keyword_db_unavailable",
         )
     return jsonify({"ok": True, **KEYWORD_DB.browser_data()})
+
+
+@app.route("/api/query-terms")
+def query_terms():
+    """Search fields for the query bar's autocomplete. Needs no urlscan key."""
+    limited = enforce_rate_limit()
+    if limited:
+        return limited
+    if QUERY_TERMS is None:
+        return fail(
+            "The query term list could not be loaded on this server.",
+            503,
+            "query_terms_unavailable",
+        )
+    return jsonify({"ok": True, "terms": QUERY_TERMS.browser_data()})
 
 
 @app.route("/api/quotas")

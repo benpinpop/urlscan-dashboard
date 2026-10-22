@@ -23,6 +23,9 @@
   --alert:        #c53d52;
   --warn:         #b97816;
   --ok:           #19866b;
+  /* Pro-plan badge. Dark text on yellow: white on this yellow fails contrast. */
+  --pro:          #f2c94c;
+  --pro-ink:      #1f1600;
 
   --sans: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
   --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace;
@@ -37,7 +40,9 @@
    agent's [hidden] rule and leave dialogs and banners visible. */
 [hidden] { display: none !important; }
 
-html { -webkit-text-size-adjust: 100%; }
+/* The body background is painted on the canvas but sized to the root box, so
+   without a full-height root it tiles (a visible seam) on short pages. */
+html { -webkit-text-size-adjust: 100%; min-height: 100%; }
 
 body {
   margin: 0;
@@ -91,6 +96,10 @@ code {
   background-clip: text;
   color: transparent;
   text-shadow: 0 0 34px rgba(76, 225, 210, 0.16);
+  /* background-clip: text only paints inside the box; the tight line-height
+     cut off the Q and y descenders. Extend the box without moving the layout. */
+  padding-bottom: 0.12em;
+  margin-bottom: -0.12em;
 }
 
 .sheet-head__title p {
@@ -118,6 +127,8 @@ code {
 
 .key__row { display: flex; gap: 8px; }
 
+/* .key scope so these beat .field, which is declared later. */
+.key .key__input,
 .key__input {
   flex: 1 1 auto;
   min-width: 0;
@@ -210,6 +221,149 @@ code {
 .query-row .field--query { flex: 1 1 auto; min-width: 0; }
 .query-row .btn { flex: 0 0 auto; }
 
+/* --- Query autocomplete (static/js/autocomplete.js) --------------------- */
+
+/* The wrapper takes the input's place in the row, so the list below can be
+   positioned against it and match the input's width exactly. */
+.query-box {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.query-box .field--query { width: 100%; }
+
+.qac {
+  position: absolute;
+  z-index: 40;                 /* inside .console: above the export menu (30) */
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--mount-deep);
+  border: 1px solid var(--mount-line);
+  border-radius: 6px;
+  box-shadow: 0 14px 30px rgba(3, 13, 34, 0.45);
+  overflow: hidden;
+}
+
+.qac__list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  max-height: min(31rem, 60vh);  /* about eight rows, then it scrolls */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.qac__option {
+  padding: 7px 12px 8px;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+  color: var(--paper);
+}
+
+.qac__option:hover { background: rgba(18, 54, 107, 0.6); }
+
+.qac__option.is-active {
+  background: var(--mount-glow);
+  border-left-color: var(--cyan);
+}
+
+.qac__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.qac__field {
+  min-width: 0;
+  font-size: 13.5px;
+  overflow-wrap: anywhere;
+}
+
+.qac__match { color: var(--cyan); font-weight: 700; }
+
+.qac__tags {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.qac__type,
+.qac__regex {
+  font: 600 10px/1 var(--mono);
+  letter-spacing: 0.02em;
+  color: var(--ink-faint);
+}
+
+.qac__regex {
+  padding: 2px 4px;
+  border: 1px solid var(--mount-line);
+  border-radius: 2px;
+}
+
+.qac__desc {
+  margin: 3px 0 0;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: #b7c6dc;
+}
+
+.qac__example {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 4px 0 0;
+  font-size: 12px;
+}
+
+.qac__code {
+  min-width: 0;
+  padding: 0;                  /* drop the global code chip so it lines up with the text above */
+  background: none;
+  font-family: var(--mono);
+  color: var(--annot-bright);
+  overflow-wrap: anywhere;
+}
+
+.qac__use {
+  flex: 0 0 auto;
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--ink-faint);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.qac__example:hover .qac__use,
+.qac__option.is-active .qac__use { color: var(--paper); }
+
+.qac__hint {
+  margin: 0;
+  padding: 6px 12px;
+  border-top: 1px solid var(--mount-line);
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+/* Modelled on .report-status: same size, font and radius, but yellow, and the
+   word PRO is always there so the colour is never the only signal. */
+.pro-badge {
+  flex: 0 0 auto;
+  font: 600 10px/1 var(--mono);
+  letter-spacing: 0.02em;
+  padding: 3px 5px;
+  border-radius: 2px;
+  background: var(--pro);
+  color: var(--pro-ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qac__list { scroll-behavior: auto; }
+}
+
 .query-dns-toggle {
   display: flex !important;
   align-items: center;
@@ -235,6 +389,7 @@ code {
   width: auto;
   margin-left: auto;
   justify-content: flex-end;
+  align-self: flex-end;
 }
 
 .query-pivot .btn { min-width: 190px; }
@@ -244,20 +399,32 @@ code {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  align-items: flex-end;
+  align-items: stretch;
 }
 
+/* Wraps rather than running off the right edge between 760px and ~960px, and
+   when the optional knobs (DNS status, Reported status, ScamBusters) appear. */
 .sort-tools {
   margin-top: 14px;
   padding-top: 14px;
   border-top: 1px solid rgba(110, 200, 255, 0.3);
-  flex-wrap: nowrap;
   overflow: visible;
 }
 
 .sort-tools > .knob { flex: 0 0 auto; }
 
+/* Label on top, control at the bottom: every label in a row lines up even
+   though the controls under them are different heights. */
 .knob { flex: 0 1 190px; min-width: 130px; }
+
+.console .knob {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.console label.knob { margin-bottom: 0; }
 .knob--density { flex: 0 0 auto; }
 .knob--collapse { flex: 0 1 auto; min-width: 190px; }
 .knob--details { flex: 0 0 auto; min-width: 0; }
@@ -451,7 +618,8 @@ code {
   padding: 14px 0 4px;
 }
 
-.status__line { margin: 0; font-size: 14px; color: #c3c6cc; }
+/* Auto margin keeps the two buttons together on the right. */
+.status__line { margin: 0 auto 0 0; font-size: 14px; color: #c3c6cc; }
 .status__line strong { color: var(--paper); font-variant-numeric: tabular-nums; }
 
 .alert {
@@ -695,14 +863,19 @@ code {
   font-size: 14px;
   color: var(--annot);
   text-decoration: none;
-  overflow-wrap: anywhere;
+  /* break-word, not anywhere: a domain only breaks mid-word when it cannot fit
+     on a line of its own, so it never gets squeezed into a narrow column. */
+  overflow-wrap: break-word;
   line-height: 1.25;
 }
 
+/* The badges ride beside the domain while both fit at full width; when the
+   domain's one-line width plus the badges overflows, they wrap underneath. */
 .frame__domain-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 8px;
+  gap: 4px 8px;
 }
 
 .frame__domain { flex: 1 1 auto; min-width: 0; }
@@ -768,6 +941,19 @@ code {
   color: var(--ink);
   overflow-wrap: anywhere;
 }
+
+/* Address and country chip as two flex items: the chip stays on the address's
+   line when it fits, otherwise moves whole to the next line, flush left. A
+   long IPv6 address fills full lines rather than leaving a stub beside the chip. */
+.fact--ip dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 4px;
+}
+
+.fact--ip .cc { margin-left: 0; }
+.fact__addr { min-width: 0; }
 
 .frame__analyze {
   display: block;
@@ -887,6 +1073,7 @@ code {
   border-radius: 2px;
   padding: 0 3px;
   margin-left: 4px;
+  white-space: nowrap;         /* never split a country code across lines */
 }
 
 /* Ten across is a scanning view: drop the labels, keep the signals. */
@@ -979,6 +1166,8 @@ code {
 @media (max-width: 1060px) {
   .sheet-head { grid-template-columns: minmax(0, 1fr); gap: 20px; }
   .cols-6, .cols-10 { --cols: 4; }
+  /* Export wraps to the start of a line here; open its menu rightwards. */
+  .export-menu { left: 0; right: auto; }
 }
 
 @media (max-width: 760px) {
@@ -987,9 +1176,12 @@ code {
 
 @media (max-width: 760px) {
   body { padding: 0 14px 48px; }
-  .console { position: static; }
+  /* Not sticky here, but still a stacking context above the sheet, so the
+     autocomplete list is not painted under the result frames. */
+  .console { position: relative; }
   .query-row { align-items: stretch; flex-direction: column; gap: 8px; }
   .query-row .btn { align-self: flex-start; }
+  .qac__example { flex-wrap: wrap; }
   .sort-tools { flex-wrap: wrap; overflow-x: visible; }
   .knob { flex: 1 1 140px; }
   .cols-4, .cols-6, .cols-10 { --cols: 2; }

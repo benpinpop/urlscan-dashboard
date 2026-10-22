@@ -161,6 +161,48 @@ class RouteTests(unittest.TestCase):
         self.assertTrue(body["categories"])
         self.assertTrue(body["keywords"])
 
+    # -- /api/query-terms ------------------------------------------------
+
+    def test_query_terms_need_no_key(self):
+        response, body = self.get("/api/query-terms", key=None)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(body["ok"])
+        self.assertGreater(len(body["terms"]), 100)
+        self.assertEqual(response.headers["Cache-Control"], "no-store")
+        fields = {term["field"]: term for term in body["terms"]}
+        self.assertEqual(
+            set(fields["domain"]),
+            {"field", "group", "type", "plan", "regex", "description", "example"},
+        )
+        self.assertEqual(fields["brand.name"]["plan"], "pro")
+        self.assertEqual(fields["domain"]["plan"], "free")
+        self.assertEqual(fields["domain.keyword"]["regex"], "true")
+
+    def test_query_terms_keep_quoted_commas(self):
+        _, body = self.get("/api/query-terms")
+        fields = {term["field"]: term for term in body["terms"]}
+        self.assertEqual(fields["asnname.keyword"]["example"], 'asnname.keyword:"CLOUDFLARENET, US"')
+        self.assertEqual(fields["asnname"]["description"], "AS names contacted. Tokenised, so single words match.")
+
+    def test_query_terms_report_a_missing_list(self):
+        real = application.QUERY_TERMS
+        application.QUERY_TERMS = None
+        try:
+            response, body = self.get("/api/query-terms")
+        finally:
+            application.QUERY_TERMS = real
+        self.assertEqual(response.status_code, 503)
+        self.assertFalse(body["ok"])
+        self.assertEqual(body["error"]["code"], "query_terms_unavailable")
+        self.assertEqual(response.headers["Cache-Control"], "no-store")
+
+    def test_query_terms_are_rate_limited(self):
+        for _ in range(application.limiter.per_minute):
+            application.limiter.check("127.0.0.1")
+        response, body = self.get("/api/query-terms")
+        self.assertEqual(response.status_code, 429)
+        self.assertEqual(body["error"]["code"], "local_rate_limited")
+
     def test_config_advertises_the_analyzer(self):
         response, body = self.get("/api/config")
         self.assertEqual(response.status_code, 200)

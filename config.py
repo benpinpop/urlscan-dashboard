@@ -46,6 +46,8 @@ class Config:
     # Where the risk-word database and the domain classification table live.
     KEYWORD_DB_PATH = os.environ.get("KEYWORD_DB_PATH") or None
     DOMAIN_TABLE_PATH = os.environ.get("DOMAIN_TABLE_PATH") or None
+    # urlscan search fields offered by the query bar's autocomplete.
+    QUERY_TERMS_PATH = os.environ.get("QUERY_TERMS_PATH") or None
 
     # Ceiling on a fetched DOM. Page content is attacker-controlled, so this is
     # a memory guard, not a tuning knob: raise it only if you need to.

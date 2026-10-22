@@ -41,6 +41,9 @@
       exportLive: document.getElementById("export-live"),
       exportDedupe: document.getElementById("export-dedupe"),
       exportStatusFilters: document.getElementById("export-status-filters"),
+      exportReportFilters: document.getElementById("export-report-filters"),
+      exportReported: document.getElementById("export-reported"),
+      exportUnreported: document.getElementById("export-unreported"),
       exportType: document.getElementById("export-type"),
       exportDownload: document.getElementById("export-download"),
     run: document.getElementById("run"),
@@ -119,6 +122,23 @@
     if (!available) {
       el.toggleDead.setAttribute("aria-pressed", "false");
       el.toggleDead.textContent = "Hide dead sites";
+    }
+  }
+
+  /* The export's Reported / Unreported choice only exists while an imported
+   * reported-sites list does. Without one the boxes are hidden and reset, so
+   * the next import starts from "include both" and export works as before. */
+  function hasReportedSites() {
+    return !!(state.reportedSites && state.reportedSites.size);
+  }
+
+  function syncReportedExportUi() {
+    if (!el.exportReportFilters) return;
+    var available = hasReportedSites();
+    el.exportReportFilters.hidden = !available;
+    if (!available) {
+      el.exportReported.checked = true;
+      el.exportUnreported.checked = true;
     }
   }
 
@@ -491,7 +511,18 @@
     }
 
     var ip = node.querySelector(".fact--ip dd");
-    ip.textContent = result.ip || "Not recorded";
+    // One wrapper so the address and the country chip are the dd's only two
+    // flex items. <wbr> after each colon lets a long IPv6 address break
+    // between groups instead of mid-group in narrow frames.
+    var address = document.createElement("span");
+    address.className = "fact__addr";
+    var groups = String(result.ip || "Not recorded").split(":");
+    groups.forEach(function (group, i) {
+      var last = i === groups.length - 1;
+      address.appendChild(document.createTextNode(last ? group : group + ":"));
+      if (!last) address.appendChild(document.createElement("wbr"));
+    });
+    ip.appendChild(address);
     if (result.country) {
       var cc = document.createElement("span");
       cc.className = "cc";
@@ -659,6 +690,7 @@
     el.sheet.appendChild(fragment);
 
     el.empty.hidden = true;
+    syncReportedExportUi();
     updateStatus();
     applyFilter();
   }
@@ -699,8 +731,15 @@
     function exportResults() {
       var includeDead = !state.dnsAvailable || el.exportDead.checked;
       var includeLive = !state.dnsAvailable || el.exportLive.checked;
+      var reportFilter = hasReportedSites() && el.exportReportFilters && !el.exportReportFilters.hidden;
+      var includeReported = !reportFilter || el.exportReported.checked;
+      var includeUnreported = !reportFilter || el.exportUnreported.checked;
       if (state.dnsAvailable && !includeDead && !includeLive) {
         showAlert("Select Dead sites, Live sites, or both before exporting.");
+        return;
+      }
+      if (!includeReported && !includeUnreported) {
+        showAlert("Select reported sites, unreported sites, or both before exporting.");
         return;
       }
       if (!state.results.length) {
@@ -708,14 +747,27 @@
         return;
       }
 
+      /* Export works on every loaded result, not just the frames on screen:
+       * the sheet's own "Latest scan per domain", "Hide dead sites" and the
+       * filter box never applied here, so "Hide reported sites" does not
+       * either. The menu's own checkboxes are the export's filters. */
       var results = state.results.slice();
       if (el.exportDedupe.checked) results = collapseToLatest(results);
       results = results.filter(function (result) {
         return result.dns_status ? includeLive : includeDead;
       });
+      if (reportFilter) {
+        /* Same flag the frame badge shows, refreshed by the same helper. */
+        markReportedResults();
+        results = results.filter(function (result) {
+          return result.csv_reported ? includeReported : includeUnreported;
+        });
+      }
 
       if (!results.length) {
-        showAlert("No loaded sites match the selected DNS statuses.");
+        showAlert(reportFilter
+          ? "No loaded sites match the selected DNS and report statuses."
+          : "No loaded sites match the selected DNS statuses.");
         return;
       }
 
@@ -730,6 +782,13 @@
             ? [result.domain || "", result.dns_status ? "Live" : "Dead", result.ip || "", result.live_ip || "", result.time || "", result.result_url || ""]
             : [result.domain || "", result.ip || "", result.time || "", result.result_url || ""]);
         });
+        /* With a list imported, one extra column at the end; existing columns keep their order. */
+        if (reportFilter) {
+          rows[0].push("Report status");
+          results.forEach(function (result, index) {
+            rows[index + 1].push(result.csv_reported ? "Reported" : "Unreported");
+          });
+        }
         content = rows.map(function (row) { return row.map(csvCell).join(","); }).join("\r\n") + "\r\n";
       } else {
         content = results.map(function (result) { return result.domain || "Unknown domain"; }).join("\r\n") + "\r\n";
@@ -978,6 +1037,7 @@
   });
   el.toggleExport.addEventListener("click", function () {
     var opening = el.exportMenu.hidden;
+    if (opening) syncReportedExportUi();
     el.exportMenu.hidden = !opening;
     el.toggleExport.setAttribute("aria-expanded", String(opening));
   });
@@ -1092,4 +1152,5 @@
   loadReportedSites();
   loadStoredKey();
   syncDnsUi();
+  syncReportedExportUi();
 })();

@@ -377,8 +377,10 @@ class KeywordDatabase:
             "matches": matches[:max_matches],
             "matches_truncated": max(0, len(matches) - max_matches),
             "formula": (
-                "score = 100 x (1 - e^(-points / 4)) x breadth. Each distinct keyword of "
-                "weight 2 or more contributes 0.2 to 1.25 points (plus up to 40% for "
+                f"score = 100 x (1 - e^(-points / {SIGNAL_MIDPOINT:g})) x breadth. Each distinct "
+                f"keyword of weight 2 or more contributes {min(v for v in TIER_VALUE.values() if v):g} "
+                f"to {max(TIER_VALUE.values()):g} points (plus up to "
+                f"{round(REPEAT_BONUS * REPEAT_BONUS_CAP * 100):d}% for "
                 "repetition); weight-1 rows are topic vocabulary and score nothing. Breadth "
                 f"rises from {BREADTH_FLOOR} to 1.0 as scoring matches spread across "
                 f"{BREADTH_FULL_AT} or more categories. Page length is not an input."

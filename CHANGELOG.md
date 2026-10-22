@@ -1,5 +1,66 @@
 # Changelog
 
+## Unreleased: Export by report status
+
+With a reported-sites CSV imported, the Export menu can include or exclude Reported and Unreported
+sites. Without an import, export is unchanged.
+
+### Added
+
+- `templates/index.html`: `#export-report-filters` fieldset (`#export-reported`,
+  `#export-unreported`, both checked) in the Export menu, hidden by default. Styled by the existing
+  `.export-menu fieldset` rules; no CSS change.
+- `static/js/app.js`: `hasReportedSites` and `syncReportedExportUi` (shows the fieldset only while
+  `state.reportedSites` is non-empty and resets both boxes to checked when the list goes away). It is
+  called from `render()`, when the menu opens, and at startup.
+- `exportResults`: when the list is present it calls `markReportedResults()` and filters on
+  `result.csv_reported`, the same flag the frame badge shows, after dedupe and the dead/live filter.
+  The `.csv` gets a trailing `Report status` column (`Reported` / `Unreported`) only in that case;
+  existing columns keep their order.
+- Both boxes unchecked, or no site left after filtering: no download, a message in the alert bar
+  (the existing export pattern).
+
+### Decisions
+
+- Export still covers every loaded result, as before. The sheet's **Hide reported sites** is a
+  display toggle like **Hide dead sites** and **Latest scan per domain**, neither of which ever
+  affected export, so it does not either; the new checkboxes are the export's control.
+- The checkbox state is in memory only (the DOM); nothing new is persisted.
+
+## Unreleased: Query-field autocomplete
+
+Typing a field name in the main query box opens a list of matching urlscan search fields, built from
+`database/query_terms.csv`, with a yellow **PRO** badge on fields that need a urlscan Pro plan.
+Purely additive: search, Enter-to-submit and pivots behave as before.
+
+### Added
+
+- `query_terms.py`: reads `database/query_terms.csv` once at startup with the `csv` module (quoted
+  examples such as `asnname.keyword:"CLOUDFLARENET, US"` survive intact). Rows without a valid field
+  name are skipped, duplicate fields keep their first row, `plan` and `regex` are normalised, and long
+  text is clipped.
+- `GET /api/query-terms`: `{"ok": true, "terms": [{field, group, type, plan, regex, description,
+  example}, ...]}`. Needs no urlscan key; uses the shared rate limiter and `Cache-Control: no-store`
+  like the other `/api/` routes; `503 query_terms_unavailable` if the list did not load.
+- `static/js/autocomplete.js`: completes the field-name token under the caret only (not inside a
+  value, quotes, `/regex/` or a range; `_exists_:` completes a bare field name). ARIA combobox
+  pattern with a polite result-count announcement. Tab / Enter-on-highlight / click insert `field:`;
+  Shift+Enter or clicking a row's example inserts the example. Fetched once per page load.
+- `.pro-badge` and the `.qac*` dropdown styles in `static/css/styles.css`, with `--pro` / `--pro-ink`
+  palette variables (dark text on yellow, about 11:1).
+- Config: `QUERY_TERMS_PATH`.
+- Tests: `tests/test_query_terms.py`, and `/api/query-terms` cases in `tests/test_routes.py`.
+
+### Changed
+
+- `templates/index.html`: `#query` is wrapped in `.query-box` (the dropdown's positioning context),
+  gets `autocomplete="off"` so the browser's own history list does not cover the suggestions, and an
+  `aria-label`.
+- `static/css/styles.css`: below 760px `.console` is `position: relative` instead of `static`, so it
+  still stacks above the result frames and the list is not painted under them. It stays non-sticky.
+- `app.py`: the new route, and `static/js/autocomplete.js` in `REQUIRED_ASSETS`.
+- `README.md`, `.env.example`: documented.
+
 ## Unreleased: Submit to Scambusters
 
 A **Report scam** button in the header opens a reporter panel that submits a scam site and its wallet

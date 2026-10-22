@@ -1,0 +1,115 @@
+field,group,type,plan,regex,description,example
+apikey,general,virtual,free,false,Scans submitted with one of your own API keys. Only accepts the value me.,apikey:me
+asn,network,keyword,free,false,AS numbers of every network contacted during the scan.,asn:AS15169
+asnname,network,text,free,false,"AS names contacted. Tokenised, so single words match.",asnname:cloudflare
+asnname.keyword,network,keyword,free,false,"AS names contacted, as one exact value.","asnname.keyword:""CLOUDFLARENET, US"""
+canonical.page.url,url,keyword,free,false,Canonicalised URL of the page after redirection.,"canonical.page.url:""http://example.com/"""
+canonical.task.url,url,keyword,free,false,Canonicalised URL of the submitted task.,"canonical.task.url:""http://example.com/"""
+country,network,keyword,free,false,ISO 3166-1 alpha-2 codes of all countries contacted.,country:RU
+date,time,date,free,false,When the scan ran. Supports date math and ranges.,date:>now-7d
+domain,domain,domain,free,false,Any domain or subdomain contacted. Also matches parent domains.,domain:example.com
+domain.keyword,domain,keywordRE,free,true,"Domains contacted, as one exact value. Supports regex and leading wildcards.",domain.keyword:/.*-login\.com/
+filename,url,text,free,false,"Any URL requested during the scan, tokenised.",filename:login.php
+filename.keyword,url,keywordRE,free,true,Requested URLs as one exact value. Supports regex.,filename.keyword:/.*\/wp-admin\/.*/
+hash,hash,keyword,free,false,SHA-256 of any HTTP response body. The field behind hash pivots.,hash:9f2c1b0a8e7d6c5b4a39281706f5e4d3c2b1a09f8e7d6c5b4a3928170615243f
+ip,network,ip,free,false,Any IP contacted. Accepts a single address or CIDR subnet.,ip:8.8.8.8/24
+server,http,keyword,free,false,HTTP Server header seen on subrequests.,server:nginx
+team,general,virtual,free,false,Scans submitted by your teams. Only accepts the value me.,team:me
+user,general,virtual,free,false,Scans you submitted. Only accepts the value me.,user:me
+files.filename,files,textRE,free,true,Filename of a file downloaded during the scan.,files.filename:invoice.pdf
+files.filename.keyword,files,keyword,free,false,Downloaded filename as one exact value.,"files.filename.keyword:""Wallet-Setup.exe"""
+files.filesize,files,integer,free,false,Size of a downloaded file in bytes.,files.filesize:>1000000
+files.mimeDescription,files,text,free,false,Human-readable MIME description of a downloaded file.,"files.mimeDescription:""PE32 executable"""
+files.mimeType,files,keywordRE,free,true,MIME type of a downloaded file. Supports regex.,files.mimeType:application/octet-stream
+files.sha256,files,keyword,free,false,SHA-256 of a downloaded file.,files.sha256:aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899
+files.state,files,keyword,free,false,Download state of the file.,files.state:complete
+files.url,files,textRE,free,true,URL a downloaded file came from. Supports regex.,"files.url:""/downloads/setup.exe"""
+page.apexDomain,page,keyword,free,false,Apex (registrable) domain of the scanned page.,page.apexDomain:example.com
+page.apexDomainAgeDays,page,integer,free,false,Age of the page apex domain in days. Low values flag fresh registrations.,page.apexDomainAgeDays:<30
+page.asn,page,keyword,free,false,AS number of the primary IP.,page.asn:AS64500
+page.asnname,page,text,free,false,"AS name of the primary IP, tokenised.",page.asnname:digitalocean
+page.asnname.keyword,page,keyword,free,false,AS name of the primary IP as one exact value.,"page.asnname.keyword:""DIGITALOCEAN-ASN, US"""
+page.country,page,keyword,free,false,GeoIP country of the primary IP.,page.country:NL
+page.domain,page,domain,free,false,Primary domain of the page. Also matches parent domains.,page.domain:example.com
+page.domain.keyword,page,keywordRE,free,true,Primary domain as one exact value. Supports regex and leading wildcards.,page.domain.keyword:/.*secure.*login.*/
+page.domainAgeDays,page,integer,free,false,Age of the page hostname in days.,page.domainAgeDays:<7
+page.ip,page,ip,free,false,Primary IP contacted. Accepts a CIDR subnet.,page.ip:203.0.113.42
+page.language,page,keyword,free,false,ISO-639 language code detected from the page text.,page.language:ru
+page.mimeType,page,keyword,free,false,MIME type of the primary response.,page.mimeType:text/html
+page.ptr,page,domain,free,false,Reverse DNS (PTR) record of the primary IP.,page.ptr:amazonaws.com
+page.redirected,page,keyword,free,false,How the final page relates to the submitted URL.,page.redirected:off-domain
+page.server,page,text,free,false,HTTP Server header of the primary request.,page.server:cloudflare
+page.status,page,keyword,free,false,HTTP status code of the primary response.,page.status:200
+page.title,page,text,free,false,"Page title, tokenised.","page.title:""account verification"""
+page.title.keyword,page,keywordRE,free,true,Page title as one exact value. Supports regex.,page.title.keyword:/.*Sign in.*/
+page.tlsAgeDays,page,integer,free,false,"Age of the TLS certificate at scan time, in days.",page.tlsAgeDays:<3
+page.tlsIssuer,page,keyword,free,false,Issuer of the TLS certificate.,"page.tlsIssuer:""Let's Encrypt"""
+page.tlsValidDays,page,integer,free,false,Validity period of the TLS certificate in days.,page.tlsValidDays:<30
+page.tlsValidFrom,page,date,free,false,Date the TLS certificate became valid.,page.tlsValidFrom:>now-7d
+page.umbrellaRank,page,integer,free,false,Cisco Umbrella Top 1 Million rank of the domain.,page.umbrellaRank:<1000
+page.url,page,text,free,false,"Final page URL after redirection, tokenised.","page.url:""/wp-login.php"""
+page.url.keyword,page,keywordRE,free,true,Final page URL as one exact value. Supports regex.,page.url.keyword:/https:\/\/.*\/login\?.*/
+stats.dataLength,stats,integer,free,false,"Total decoded size of all subresources, in bytes.",stats.dataLength:>5000000
+stats.encodedDataLength,stats,integer,free,false,"Total transfer size of all subresources, in bytes.",stats.encodedDataLength:>1000000
+stats.requests,stats,integer,free,false,Number of subrequests the page made.,stats.requests:>100
+stats.uniqCountries,stats,integer,free,false,Number of distinct countries contacted.,stats.uniqCountries:>5
+stats.uniqIPs,stats,integer,free,false,Number of distinct IPs contacted.,stats.uniqIPs:>5
+task.apexDomain,task,keyword,free,false,Apex domain of the submitted hostname.,task.apexDomain:example.com
+task.domain,task,domain,free,false,Domain of the submitted URL. Also matches parent domains.,task.domain:example.com
+task.domain.keyword,task,keywordRE,free,true,Submitted domain as one exact value. Supports regex.,task.domain.keyword:/.*\.top/
+task.method,task,keyword,free,false,"How the scan was submitted: manual, api, automatic, urlscan-observe.",task.method:automatic
+task.source,task,keyword,free,false,"Feed the task originated from, such as openphish or certstream-suspicious.",task.source:certstream-suspicious
+task.tags,task,keyword,free,false,User-defined tags applied at submission time.,task.tags:phishing
+task.url,task,text,free,false,"Originally submitted URL, tokenised.","task.url:""/verify/account"""
+task.url.keyword,task,keywordRE,free,true,Originally submitted URL as one exact value. Supports regex.,task.url.keyword:/.*\?email=.*/
+task.uuid,task,keyword,free,false,Unique scan ID. This is what the result analyzer pulls.,task.uuid:0f8e1c4a-2b3d-4e5f-8a9b-1c2d3e4f5a6b
+task.visibility,task,keyword,free,false,"Scan visibility: public, unlisted or private.",task.visibility:public
+brand.country,brand,keyword,pro,false,ISO 3166-1 country code of the impersonated brand.,brand.country:US
+brand.key,brand,keyword,pro,false,Unique key identifying the impersonated brand.,brand.key:microsoft
+brand.name,brand,text,pro,false,"Name of the impersonated brand, tokenised.",brand.name:paypal
+brand.name.keyword,brand,keyword,pro,false,Impersonated brand name as one exact value.,"brand.name.keyword:""PayPal"""
+brand.vertical,brand,text,pro,false,"Industry vertical of the brand, such as banking.",brand.vertical:banking
+brand.vertical.keyword,brand,keyword,pro,false,Industry vertical as one exact value.,"brand.vertical.keyword:""financial services"""
+visible.brandname,brand,text,pro,false,"Brand the site visibly claims to represent, per urlscan Brand AI.",visible.brandname:netflix
+visible.brandname.keyword,brand,keyword,pro,false,Visibly claimed brand name as one exact value.,"visible.brandname.keyword:""Bank of America"""
+content.cookieNames,content,keyword,pro,false,Names of cookies the page set.,content.cookieNames:PHPSESSID
+content.globalNames,content,keyword,pro,false,Non-standard JavaScript globals defined by the page.,content.globalNames:ethereum
+content.identifiers,content,keyword,pro,false,Generic string identifiers extracted from the page.,content.identifiers:UA-12345678-1
+content.inputNames,content,keyword,pro,false,name attributes of input fields. Good for credential-harvesting forms.,content.inputNames:password
+content.inputTypes,content,keyword,pro,false,type attributes of input fields.,content.inputTypes:password
+content.storageNames,content,keyword,pro,false,localStorage and sessionStorage item names.,content.storageNames:walletconnect
+content.technologies,content,keyword,pro,false,Technologies detected by Wappalyzer.,content.technologies:WordPress
+dom.hash,dom,keyword,pro,false,SHA-256 of the DOM before truncation. Finds identical page builds.,dom.hash:9f2c1b0a8e7d6c5b4a39281706f5e4d3c2b1a09f8e7d6c5b4a3928170615243f
+dom.size,dom,integer,pro,false,"Size of the DOM before truncation, in bytes.",dom.size:>500000
+text.content,text,text,pro,false,"Visible page text, truncated to 20 kB. Phrase search works.","text.content:""guaranteed daily returns"""
+text.hash,text,keyword,pro,false,SHA-256 of the visible text before truncation.,text.hash:11223344556677889900aabbccddeeff11223344556677889900aabbccddeeff
+text.size,text,integer,pro,false,"Size of the visible text before truncation, in bytes.",text.size:<500
+frames.domains,frames,domain,pro,false,Domains loaded in frames and iframes.,frames.domains:example.com
+frames.length,frames,integer,pro,false,Number of frames on the page.,frames.length:>3
+frames.urls,frames,keywordRE,pro,true,Frame and iframe URLs. Supports regex.,frames.urls:/.*\/embed\/.*/
+links.domains,links,domain,pro,false,Domains of outgoing links.,links.domains:t.me
+links.length,links,integer,pro,false,Number of outgoing links.,links.length:>50
+links.urls,links,keywordRE,pro,true,Outgoing link URLs to other domains. Supports regex.,links.urls:/https:\/\/t\.me\/.*/
+verdicts.community.malicious,verdicts,boolean,pro,false,Whether the community voted the scan malicious.,verdicts.community.malicious:true
+verdicts.engines.malicious,verdicts,boolean,pro,false,Whether the ML engines returned a malicious verdict.,verdicts.engines.malicious:true
+verdicts.engines.score,verdicts,integer,pro,false,"ML engine score, -100 to 100.",verdicts.engines.score:>50
+verdicts.lastVerdict,verdicts,date,pro,false,When the most recent verdict was added. Only set for post-scan verdicts.,verdicts.lastVerdict:>now-24h
+verdicts.malicious,verdicts,boolean,pro,false,Whether any malicious verdict exists for the scan.,verdicts.malicious:true
+verdicts.score,verdicts,integer,pro,false,"Overall maliciousness score, -100 (benign) to 100 (malicious).",verdicts.score:>70
+verdicts.urlscan.malicious,verdicts,boolean,pro,false,Whether urlscan's own classifier called it malicious.,verdicts.urlscan.malicious:true
+scanner.country,origin,keyword,pro,false,Country the scanner exited from.,scanner.country:DE
+submitter.country,origin,keyword,pro,false,GeoIP country of the IP that submitted the scan.,submitter.country:NG
+labels,labels,keyword,pro,false,System labels applied by urlscan.,labels:phishing
+meta,labels,keyword,pro,false,IDs of matching subscriptions and saved searches.,meta:my-saved-search-id
+usertags,labels,keyword,pro,false,Tags applied by your matching Saved Searches.,usertags:watchlist
+clipboard.domains,clipboard,domainRE,pro,true,Domains that wrote to the clipboard during Live Browsing. Flags ClickFix lures.,clipboard.domains:example.com
+clipboard.hash,clipboard,keyword,pro,false,SHA-256 of the clipboard text before truncation.,clipboard.hash:aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899
+clipboard.length,clipboard,integer,pro,false,Number of clipboard write events.,clipboard.length:>0
+clipboard.sources,clipboard,keyword,pro,false,Method used to write the clipboard: clipboard-api or execCommand.,clipboard.sources:clipboard-api
+clipboard.text,clipboard,text,pro,false,Text written to the clipboard. Catches pasted PowerShell lures.,clipboard.text:powershell
+clipboard.urls,clipboard,keywordRE,pro,true,Pages that wrote to the clipboard. Supports regex.,clipboard.urls:/.*\/verify.*/
+websockets.domains,websockets,domainRE,pro,true,Domains of WebSocket connections.,websockets.domains:example.com
+websockets.length,websockets,integer,pro,false,Number of WebSocket connections opened.,websockets.length:>0
+websockets.totalBytesReceived,websockets,integer,pro,false,Total bytes received over WebSockets.,websockets.totalBytesReceived:>100000
+websockets.totalBytesSent,websockets,integer,pro,false,Total bytes sent over WebSockets.,websockets.totalBytesSent:>10000
+websockets.urls,websockets,keywordRE,pro,true,WebSocket connection URLs. Supports regex.,websockets.urls:/wss:\/\/.*/
