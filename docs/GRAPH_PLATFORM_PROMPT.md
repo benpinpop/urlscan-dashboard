@@ -133,8 +133,8 @@ Clicking any node opens a side panel (built with `createElement`, uses existing 
     search grid" (existing pivot), "Check / Report to Scambusters" (existing reporter).
   - `ip`: list of sites on it, PTR, ASN, country, count of sites seen, reverse-DNS, DoH live
     lookup (reuse `dnsLookup`).
-  - `wallet`: chain, canonical form, validation result, sites referencing it, optional Tronscan
-    lookup for TRON (see Wallets section).
+  - `wallet`: chain, canonical form, validation result, sites referencing it, and on-chain basic
+    info from Etherscan / Blockchain.com when a key is entered (see Wallets section).
   - others: member list, strength of indicator, the exact query that produced it.
 - Actions: expand, group-by, hide, add to case, add note/tag, copy as IOC, "show shortest path to...".
 
@@ -172,12 +172,65 @@ reader; nothing is uploaded unless the analyst chooses to enrich).
   per chain, then validate via `wallet_validation`. Only validated wallets become nodes.
 - Wallet clusters: sites sharing a wallet are strongly linked; highlight multi-site wallets as the
   top "operation" signal.
-- Optional on-chain enrichment through a backend route (not the browser): for `trx` addresses the
-  Tronscan MCP exposes account detail, transfers and related accounts; add a pluggable
-  `chain_providers` interface so ETH/BTC providers can be added later. Make it opt-in, rate
-  limited, and clearly labeled as external data. Do not hardcode third-party keys.
-- Wallet-to-wallet edges (`pays_to`) only from on-chain enrichment or uploads, with amount and
-  timestamp attributes.
+- Wallet-to-wallet edges (`pays_to`) come only from uploads for now (with amount and timestamp
+  attributes); on-chain counterparty edges are deferred with the deeper analysis.
+
+#### On-chain providers (basic info only; backend proxy, opt-in, labeled as external data)
+
+Create a `chain_providers/` package with a common interface (`summary(address)`, `capabilities`)
+and one module per provider, so more chains and deeper analysis can be added later. Deeper analysis
+(counterparty graphs, flow heuristics, multi-hop tracing) is **out of scope for this build**; design
+the interface so it can be added without rework, but do not implement it. The browser never calls
+providers directly (CSP `connect-src 'self'`); it calls new `/api/chain/*` routes. Verify each
+provider's current endpoints, limits and terms in its official docs before coding; do not rely on
+memory.
+
+| Provider | Chains | Auth | Notes |
+|---|---|---|---|
+| **Etherscan** (API V2, single key with a `chainid` param) | `eth`, `bsc`, `matic`, `arb`, `avax`, `op` (the EVM codes in `wallet_validation`) | API key entered by the user | Respect the free-tier rate limit and per-chain availability; surface "chain not supported on this plan" cleanly |
+| **Blockchain.com** (blockchain.info explorer API) | `btc` (and `bch` only if the API actually supports it) | Key optional or none; check current terms | Heavily rate limited; queue and back off, cache aggressively |
+
+**Key handling (client-side entry, never persisted):**
+- Keys are typed into a "Chain provider keys" panel in the browser. They live **only in a JS
+  variable in memory** for the current page session. Do not write them to `localStorage`,
+  `sessionStorage`, IndexedDB, cookies, case exports, mapper presets, the URL, or the DOM beyond a
+  masked `type="password"` input. A page reload clears them; the UI must say so ("Keys are kept in
+  memory only and are cleared when you close or reload this page"). Disable autofill/password
+  manager saving on these inputs (`autocomplete="off"`).
+- Each request sends the key to our backend as a header (`X-Etherscan-Key`, and
+  `X-Blockchain-Key` if the provider uses one). The backend forwards it upstream for that request
+  only and never stores it: no env var, no config, no cache entry, no log line, no error message.
+  There is no server-side shared key for these providers.
+- Etherscan takes the key as an upstream query parameter, so extend the log scrubber to redact
+  `apikey=` and never log full upstream URLs. The response cache key must exclude the API key.
+- Do not include keys in any telemetry, exported file, or "copy debug info" output.
+- Add `ETHERSCAN_BASE_URL`, `BLOCKCHAIN_BASE_URL`, `CHAIN_TIMEOUT` and per-provider rate-limit
+  settings to `config.py` and the BACKEND docs (no key settings). Reuse the in-memory limiter (one
+  bucket per provider) and a TTL cache keyed by `(provider, chain, address)` with a visible "cached
+  N min ago" label.
+- Note: the existing urlscan and Scambusters keys keep their current behavior; this requirement
+  applies to the new chain provider keys. Make sure case exports and presets exclude **all** keys.
+
+**Basic information (shown in the wallet node's detail panel, fetched on click):**
+- Chain, canonical address, validity (from `wallet_validation`), address type (EOA vs contract on
+  EVM; legacy / P2SH / bech32 on BTC).
+- Balance (native coin, plus top token balances on EVM), total received/sent, transaction count,
+  first-seen and last-seen timestamps, and the contract name/verified flag when it is a contract.
+- Explorer link shown as text with a copy button (never as an `<a>`).
+- A "sites referencing this wallet" list from the graph and a count of linked scam-site nodes.
+- Native units only; show fiat only if a price source is configured, labeled as an estimate with a
+  date. Never guess a price.
+
+**UI and output:** a "Wallet intel" tab in the detail panel and a ranked table in the Scale view
+(top wallets by linked sites). Include on-chain basic info in the case JSON, node/edge CSV and IOC
+list, formula-injection safe, with provenance (`provider`, `queried_at`). Add a one-click "Add
+wallets to Scambusters report" for site+wallet pairs using the existing reporter (respect
+`MAX_WALLETS = 30`).
+
+**Failure handling:** distinguish provider errors from local ones (`provider_rate_limited` with
+`retry_after`, `provider_key_missing`, `provider_unsupported_chain`, `provider_error`,
+`provider_timeout`), degrade to "validation only" when no key is entered, and never block the rest
+of the graph on a provider failure.
 
 ### 7. Cases, persistence, export
 - Cases: named workspaces saved to localStorage (try/catch, size-aware) with Export/Import as a
@@ -208,6 +261,8 @@ New module `graph_builder.py` (keep `app.py` thin) and routes:
 | `POST /api/graph/ingest` | Optional server-side normalize/validate of an uploaded batch (domains, wallets, hashes) so rules match the backend |
 | `POST /api/wallets/check-batch` | Batch variant of `/api/wallets/check` |
 | `GET /api/graph/transforms` | The transform catalog (id, label, entity type, field, plan) derived from `query_terms.csv` |
+| `GET /api/chain/providers` | Which providers exist per chain, their capabilities and limits (no keys) |
+| `POST /api/chain/summary` | Body `{chain, address}`, key in `X-Etherscan-Key` header. Validate with `wallet_validation` first, then call the Etherscan or Blockchain.com provider; returns the basic-info payload. Key is used for that request only |
 
 All use the standard envelope and error codes. Shape the nodes/edges in Python so the browser only
 merges. Add node-id canonicalization (`type:value`) in one shared place. Cap response size.
@@ -217,6 +272,10 @@ merges. Add node-id canonicalization (`type:value`) in one shared place. Cap res
 - Unit tests for: transform allow-list and query building (injection attempts like quotes,
   `AND`, newlines in node values), node/edge shaping from `tests/fixture_result.json`, ingestion
   normalizer (defanging, formula prefixes, dedup), wallet batch, route validation/errors.
+- Provider tests use recorded fixture responses and a stub provider; no network. Cover key
+  redaction in logs, unsupported chains, rate-limit and timeout mapping,
+  hostile values in contract names/labels, and a test that no log line, error body, cache key or
+  response contains the key.
 - Run `python -m unittest discover -s tests`; all existing 113 tests must still pass.
 - Use `tests/stub_server.py` extended with canned graph data to demo the UI offline. Verify in a
   real browser at 1k, 10k and 50k synthetic nodes; report frame rate and memory.
@@ -231,6 +290,7 @@ merges. Add node-id canonicalization (`type:value`) in one shared place. Cap res
    investigations, e.g. start from `domain:"smartsuppchat.com" AND domain:"coingecko.com"`
    and expand outward by IP, hash and filename to map a crypto-investment-scam cluster.
 3. A summary listing what was built, what was deliberately deferred, any decision you made without
-   me, and risks (API quota usage, memory at scale, privacy of uploaded datasets).
+   me, and risks (API quota usage for urlscan, Etherscan and Blockchain.com, memory at scale,
+   privacy of uploaded datasets, key handling for chain providers).
 
 Then **stop and wait for my review**.
