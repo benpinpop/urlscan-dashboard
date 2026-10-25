@@ -161,7 +161,7 @@ window.TitanEyeCrawl = (function () {
     var g = core.graph();
     var seed = core.selected();
     if (!g || !seed) {
-      say("Select a node in the graph first. The crawl starts from it.", "warn");
+      say("Click a node in the graph first. The crawl starts from it.", "warn");
       return;
     }
     run = { active: true, queue: [], seen: {}, requests: 0, spent: 0, added: 0, errors: 0, problems: 0 };
@@ -210,9 +210,8 @@ window.TitanEyeCrawl = (function () {
 
   function build() {
     var box = el.slot;
-    box.appendChild(make("h3", "te-section__title", "Map infrastructure"));
     box.appendChild(make("p", "te-note",
-      "Select a node, then crawl outward from it. The crawl is capped, spaced out to respect the search limit, and can be cancelled or resumed."));
+      "The crawl is capped, spaced out to respect the search limit, and can be cancelled or resumed."));
 
     box.appendChild(numberField("Depth (1-3)", "depth", 1, 3));
     box.appendChild(numberField("Most requests", "requests", 1, 500));
@@ -290,6 +289,13 @@ window.TitanEyeCrawl = (function () {
     el.slot = document.getElementById("te-crawl-slot");
     if (!core || !el.slot) return false;
     build();
+    /* The crawl starts from the selected node, so it lives in that node's detail panel
+     * (the right-hand panel shows the scale view while nothing is selected). */
+    el.slot.hidden = false;
+    var wrap = make("details", "te-section te-crawl");
+    wrap.appendChild(make("summary", "te-crawl__summary", "Crawl outward from this node"));
+    wrap.appendChild(el.slot);
+    core.addDetailSection(function () { return wrap; });
     return true;
   }
 

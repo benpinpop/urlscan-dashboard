@@ -64,6 +64,9 @@ gets urlscan's own error back.
 - Layout: ForceAtlas2 in a Web Worker (`static/vendor/forceatlas2.worker.js`), flat matrices in,
   positions out every 10 iterations. Any graph change restarts it from current positions. Node size
   scales down with graph size.
+- The selected node's lines are drawn on a transparent 2D canvas above the WebGL layers, over every node except the selected one
+  (`drawSelectionEdges`, after every sigma render) because sigma always draws edges under nodes; the
+  normal edge pass hides those edges so they are not drawn twice.
 - Selection dims everything except the node and its neighbours; the legend doubles as a type filter.
 - Node detail: value with copy button, connection counts, scan attrs, screenshot (only from
   `https://urlscan.io/`), per-type transforms with the exact query shown, "Open scan in analyzer",
@@ -158,7 +161,12 @@ import dialog is closed. Implemented in `titaneye.js` (`runFind`, `stepFind`, `r
 
 ## Scale view, filters and clusters (phase 4)
 
-`static/js/titaneye-scale.js`, opened from **Scale view** (a left drawer over the graph).
+`static/js/titaneye-scale.js`. The right-hand panel (`#te-side`) is hidden until the graph has at least
+one node (the canvas uses the full width until then), and clearing the graph hides it again. Once shown it
+fills with the scale view whenever no node is selected;
+selecting a node (click, Find result, cluster or ranking jump) swaps it for that node's details, and
+clicking empty canvas or **&larr; Scale view** in the detail panel swaps it back (`core.onSelect`). It
+refreshes on return, so changes made while a node was selected are caught up. Hovering does not swap it.
 
 - Overview: sites, IPs, apex domains, ASNs, countries, wallets, median domain age and a scans-over-time
   histogram.
@@ -178,7 +186,8 @@ import dialog is closed. Implemented in `titaneye.js` (`runFind`, `stepFind`, `r
 
 ## Crawler (phase 4)
 
-`static/js/titaneye-crawl.js`, at the bottom of the scale drawer. Select a node, set depth (1-3),
+`static/js/titaneye-crawl.js`, a collapsible **Crawl outward from this node** section in the selected
+node's detail panel. Select a node, set depth (1-3),
 request and node caps, the delay between requests (default 2 s, which fits the default 30 per minute
 limit), a skip threshold for indicators shared by many sites, the indicator types to follow (IP, apex
 domain, hash and filename by default) and whether to include Pro transforms. It runs one expansion at
@@ -238,8 +247,21 @@ wallets, brands and tags on; technologies and redirects off). **Add scan to Tita
 results-grid frame and in the analyzer header call `TitanEyeScan.addScan(uuid)`: open the graph, add
 the site with its core nodes, select it, and leave the checklist open.
 
+**Only add lines to nodes already on the graph** (checkbox above the list, remembered): nothing new is created;
+a node is kept only if it is already on the graph and an edge only if both ends are, so the scan links the
+site to indicators you already have. The category counts then show how many are already present.
+
 Not covered: wallets in page text (the DOM is a separate fetch, and the result document has no page
 text), certificate fingerprints, and looking a scan up from a bare domain.
+
+## Undo
+
+`titaneye.js` (`pushUndo`, `undo`). Backspace or Delete removes the selected node (`removeNode`, undoable). The **Undo** button (top right) and Ctrl+Z reverse, newest first, up to 50
+changes to the graph's contents: an add (`merge` journals the node and edge ids it created and the
+previous attributes of nodes it merged into), **Remove from graph**, **Hide node**, and **Clear**
+(restored from `graph.export()`). Not undoable: filters, layout moves, case loads (a case load empties the
+history), and attribute changes to edges that already existed. The shortcuts are active only while the
+graph is on screen and neither the analyzer nor a dialog is open; in a text box Ctrl+Z is the browser's.
 
 ## Declutter and tidy layout
 

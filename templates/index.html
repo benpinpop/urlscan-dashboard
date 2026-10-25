@@ -325,11 +325,11 @@
       <option value="none">Edges: none</option>
     </select>
     <button type="button" id="te-import-open" class="btn btn--small" aria-haspopup="dialog" aria-controls="te-import">Import dataset</button>
-    <button type="button" id="te-scale-open" class="btn btn--small" aria-controls="te-scale">Scale view</button>
     <button type="button" id="te-cases-open" class="btn btn--small" aria-haspopup="dialog" aria-controls="te-cases">Cases &amp; export</button>
     <button type="button" id="te-keys-open" class="btn btn--ghost btn--small" aria-haspopup="dialog" aria-controls="te-keys">Keys</button>
     <button type="button" id="te-find-open" class="btn btn--ghost btn--small" title="Find on the graph (Ctrl+F)">Find</button>
     <button type="button" id="te-clear" class="btn btn--ghost btn--small">Clear</button>
+    <button type="button" id="te-undo" class="btn btn--small te-bar__undo" disabled title="Nothing to undo (Ctrl+Z)">Undo</button>
   </div>
   <div class="te-statusbar">
     <p class="te-status" id="te-status" role="status" aria-live="polite">Pick an expansion type and a value to start the graph.</p>
@@ -343,15 +343,6 @@
         <div class="te-tip__value" id="te-tip-value"></div>
         <div class="te-tip__meta" id="te-tip-meta"></div>
       </div>
-      <aside class="te-drawer" id="te-scale" hidden aria-label="Scale view">
-        <div class="te-drawer__head">
-          <h3>Scale view</h3>
-          <button type="button" id="te-scale-refresh" class="btn btn--ghost btn--small">Refresh</button>
-          <button type="button" id="te-scale-close" class="btn btn--ghost btn--small" aria-label="Close scale view">&times;</button>
-        </div>
-        <div class="te-drawer__body" id="te-scale-body"></div>
-        <div class="te-drawer__section te-drawer__section--crawl" id="te-crawl-slot"></div>
-      </aside>
       <div class="te-find" id="te-find" role="search" hidden>
         <div class="te-find__row">
           <label class="sr-only" for="te-find-input">Find on the graph</label>
@@ -367,8 +358,16 @@
       <div class="te-legend te-legend--layers" id="te-layers" role="group" aria-label="Show or hide datasets" hidden></div>
       <div class="te-legend" id="te-legend" role="group" aria-label="Show or hide node types"></div>
     </div>
-    <aside class="te-side" aria-label="Node details">
-      <div id="te-detail"></div>
+    <aside class="te-side" id="te-side" hidden aria-label="Scale view and node details">
+      <div id="te-scale" class="te-overview">
+        <div class="te-drawer__head">
+          <h3>Scale view</h3>
+          <button type="button" id="te-scale-refresh" class="btn btn--ghost btn--small">Refresh</button>
+        </div>
+        <div class="te-drawer__body" id="te-scale-body"></div>
+      </div>
+      <div id="te-detail" hidden></div>
+      <div id="te-crawl-slot" hidden></div>
     </aside>
   </div>
   <div class="te-modal" id="te-cases" hidden role="dialog" aria-modal="true" aria-labelledby="te-cases-title">

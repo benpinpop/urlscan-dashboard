@@ -51,6 +51,8 @@ window.TitanEye = (function () {
     edgeMode: "auto",
     declutter: { on: false, min: 2, hidden: 0 },
     detailSections: [],
+    selectListeners: [],
+    undo: [],
     listeners: [],
     transforms: [],
     busy: false,
@@ -130,11 +132,64 @@ window.TitanEye = (function () {
       nodeReducer: reduceNode,
       edgeReducer: reduceEdge
     });
+    /* Sigma always draws edges under nodes, so the selected node's lines are drawn again on
+     * a transparent canvas above everything (see drawSelectionEdges). */
+    el.overlay = document.createElement("canvas");
+    el.overlay.className = "te-overlay";
+    el.overlay.setAttribute("aria-hidden", "true");
+    el.canvas.appendChild(el.overlay);
+    state.renderer.on("afterRender", drawSelectionEdges);
     state.renderer.on("clickNode", function (event) { select(event.node); });
     state.renderer.on("clickStage", function () { select(null); });
     state.renderer.on("enterNode", function (event) { showTip(event.node); });
     state.renderer.on("leaveNode", hideTip);
     state.renderer.getCamera().on("updated", hideTip);
+  }
+
+  var SELECTION_EDGE_COLOR = "rgba(110, 200, 255, 0.85)";
+
+  /* Lines from the selected node to its neighbours, on top of every node except the selected one. */
+  function drawSelectionEdges() {
+    var canvas = el.overlay;
+    var g = state.graph;
+    if (!canvas || !g || !state.renderer) return;
+    var ratio = window.devicePixelRatio || 1;
+    var width = el.canvas.clientWidth;
+    var height = el.canvas.clientHeight;
+    if (canvas.width !== Math.round(width * ratio) || canvas.height !== Math.round(height * ratio)) {
+      canvas.width = Math.round(width * ratio);
+      canvas.height = Math.round(height * ratio);
+      canvas.style.width = width + "px";
+      canvas.style.height = height + "px";
+    }
+    var ctx = canvas.getContext("2d");
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    ctx.clearRect(0, 0, width, height);
+    var id = state.selected;
+    if (!id || !g.hasNode(id) || state.find.active || edgeMode() === "none") return;
+    if (g.getNodeAttribute(id, "hidden")) return;
+    var from = state.renderer.graphToViewport({ x: g.getNodeAttribute(id, "x"), y: g.getNodeAttribute(id, "y") });
+    ctx.strokeStyle = SELECTION_EDGE_COLOR;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    g.forEachEdge(id, function (edge, attrs, source, target) {
+      if (attrs.hidden) return;
+      var other = source === id ? target : source;
+      if (other === id || g.getNodeAttribute(other, "hidden")) return;
+      var to = state.renderer.graphToViewport({ x: g.getNodeAttribute(other, "x"), y: g.getNodeAttribute(other, "y") });
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(to.x, to.y);
+    });
+    ctx.stroke();
+
+    /* The lines go over the other nodes but not over the selected one: put its dot back on top. */
+    var shown = state.renderer.getNodeDisplayData(id);
+    if (shown) {
+      ctx.fillStyle = shown.color;
+      ctx.beginPath();
+      ctx.arc(from.x, from.y, state.renderer.scaleSize(shown.size), 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   /* Hover tooltip with the full value; long values are clipped on the canvas. */
@@ -215,7 +270,8 @@ window.TitanEye = (function () {
     if (!state.selected) return onlyAround ? hiddenEdge(data) : data;
     pair = state.graph.extremities(edge);
     if (pair[0] === state.selected || pair[1] === state.selected) {
-      return { color: "rgba(110, 200, 255, 0.85)", size: 2, zIndex: 1, hidden: data.hidden };
+      /* Drawn by drawSelectionEdges, above the nodes. */
+      return hiddenEdge(data);
     }
     return onlyAround ? hiddenEdge(data) : { color: "rgba(80, 100, 130, 0.12)", size: 1, hidden: data.hidden };
   }
@@ -281,6 +337,7 @@ window.TitanEye = (function () {
     ensureGraph();
     var g = state.graph;
     var added = { nodes: 0, edges: 0 };
+    var journal = { kind: "add", nodes: [], edges: [], prev: {} };
     if (layer && !state.layers[layer]) state.layers[layer] = { hidden: false };
 
     (fragment.nodes || []).forEach(function (n) {
@@ -291,6 +348,7 @@ window.TitanEye = (function () {
       }
       if (g.hasNode(n.id)) {
         var data = g.getNodeAttribute(n.id, "data");
+        if (!journal.prev[n.id]) journal.prev[n.id] = copyData(data);
         mergeAttrs(data, n.attrs || {});
         g.setNodeAttribute(n.id, "data", data);
       } else {
@@ -308,6 +366,7 @@ window.TitanEye = (function () {
           data: n.attrs || {}
         });
         added.nodes += 1;
+        journal.nodes.push(n.id);
       }
     });
 
@@ -323,11 +382,85 @@ window.TitanEye = (function () {
         etype: e.type, size: 1, color: EDGE_COLOR, data: e.attrs || {}
       });
       added.edges += 1;
+      journal.edges.push(e.id);
     });
 
+    if (added.nodes || added.edges) {
+      journal.label = "add " + added.nodes + " nodes and " + added.edges + " edges";
+      pushUndo(journal);
+    }
     resizeAll();
     refreshVisibility();
     return added;
+  }
+
+  /* ---------------------------------------------------------------- undo */
+
+  var UNDO_LIMIT = 50;
+
+  /* Attribute objects hold scalars and arrays of scalars, so one level of copying is enough. */
+  function copyData(data) {
+    var out = {};
+    Object.keys(data || {}).forEach(function (key) {
+      out[key] = Array.isArray(data[key]) ? data[key].slice() : data[key];
+    });
+    return out;
+  }
+
+  function updateUndoButton() {
+    if (!el.undo) return;
+    var last = state.undo[state.undo.length - 1];
+    el.undo.disabled = !last;
+    el.undo.title = last ? "Undo: " + last.label + " (Ctrl+Z)" : "Nothing to undo (Ctrl+Z)";
+  }
+
+  function pushUndo(entry) {
+    state.undo.push(entry);
+    if (state.undo.length > UNDO_LIMIT) state.undo.shift();
+    updateUndoButton();
+  }
+
+  function clearUndo() {
+    state.undo = [];
+    updateUndoButton();
+  }
+
+  /* Reverse the last change to the graph: an add, a removal, a hide or a clear. */
+  function undo() {
+    var g = state.graph;
+    var entry = state.undo.pop();
+    updateUndoButton();
+    if (!entry || !g) {
+      setStatus("Nothing to undo.", "warn");
+      return;
+    }
+    stopLayout();
+    if (entry.kind === "add") {
+      entry.edges.forEach(function (id) { if (g.hasEdge(id)) g.dropEdge(id); });
+      entry.nodes.forEach(function (id) { if (g.hasNode(id)) g.dropNode(id); });
+      Object.keys(entry.prev).forEach(function (id) {
+        if (g.hasNode(id)) g.setNodeAttribute(id, "data", entry.prev[id]);
+      });
+    } else if (entry.kind === "remove") {
+      g.addNode(entry.id, entry.attrs);
+      entry.edges.forEach(function (e) {
+        if (g.hasNode(e.source) && g.hasNode(e.target) && !g.hasEdge(e.id)) {
+          g.addDirectedEdgeWithKey(e.id, e.source, e.target, e.attrs);
+        }
+      });
+    } else if (entry.kind === "hide") {
+      if (g.hasNode(entry.id)) g.setNodeAttribute(entry.id, "userHidden", entry.was);
+    } else if (entry.kind === "clear") {
+      g.import(entry.data);
+      state.layers = entry.layers;
+    }
+    resizeAll();
+    refreshVisibility();
+    if (state.selected && !g.hasNode(state.selected)) select(null);
+    else renderDetail();
+    updateCounts();
+    refreshFind();
+    setStatus("Undid: " + entry.label + ".", "ok");
   }
 
   /* A node shows unless its type is filtered, every dataset it came from is
@@ -619,6 +752,9 @@ window.TitanEye = (function () {
       g.forEachNeighbor(state.selected, function (other) { state.neighbors[other] = true; });
     }
     renderDetail();
+    /* The right-hand panel shows the scale view until a node is selected, then that node's details. */
+    el.detail.hidden = !state.selected;
+    state.selectListeners.forEach(function (listener) { listener(state.selected); });
     if (state.renderer) state.renderer.refresh();
   }
 
@@ -819,16 +955,17 @@ window.TitanEye = (function () {
     var root = el.detail;
     while (root.firstChild) root.removeChild(root.firstChild);
     var g = state.graph;
-    if (!state.selected || !g) {
-      root.appendChild(make("p", "te-empty", "Select a node to see what is known about it."));
-      return;
-    }
+    if (!state.selected || !g) return;
     var id = state.selected;
     var type = g.getNodeAttribute(id, "ntype");
     var data = g.getNodeAttribute(id, "data") || {};
     var value = nodeValue(id);
 
     var head = make("div", "te-detail__head");
+    var overview = make("button", "btn btn--ghost btn--small te-detail__back", "← Scale view");
+    overview.type = "button";
+    overview.addEventListener("click", function () { select(null); });
+    head.appendChild(overview);
     var chip = make("span", "te-chip", TYPES[type].label);
     chip.style.borderColor = TYPES[type].color;
     chip.style.color = TYPES[type].color;
@@ -910,23 +1047,36 @@ window.TitanEye = (function () {
     var hide = make("button", "btn btn--ghost btn--small", "Hide node");
     hide.type = "button";
     hide.addEventListener("click", function () {
+      pushUndo({ kind: "hide", id: id, was: !!g.getNodeAttribute(id, "userHidden"), label: "hide " + clip(value, 40) });
       g.setNodeAttribute(id, "userHidden", true);
       refreshVisibility();
       select(null);
     });
     var remove = make("button", "btn btn--ghost btn--small", "Remove from graph");
     remove.type = "button";
-    remove.addEventListener("click", function () {
-      stopLayout();
-      g.dropNode(id);
-      resizeAll();
-      select(null);
-      updateCounts();
-      refreshFind();
-    });
+    remove.addEventListener("click", function () { removeNode(id); });
     tools.appendChild(hide);
     tools.appendChild(remove);
     root.appendChild(tools);
+  }
+
+  /* Take a node and its edges off the graph; Undo puts them back. */
+  function removeNode(id) {
+    var g = state.graph;
+    if (!g || !g.hasNode(id)) return;
+    stopLayout();
+    var removed = { kind: "remove", id: id, attrs: g.getNodeAttributes(id), edges: [],
+                    label: "remove " + clip(nodeValue(id), 40) };
+    g.forEachEdge(id, function (edge, attrs, source, target) {
+      removed.edges.push({ id: edge, source: source, target: target, attrs: attrs });
+    });
+    pushUndo(removed);
+    g.dropNode(id);
+    resizeAll();
+    select(null);
+    updateCounts();
+    refreshFind();
+    setStatus("Removed " + clip(removed.label.slice(7), 60) + ". Ctrl+Z puts it back.", "ok");
   }
 
   /* ------------------------------------------------------------- legend */
@@ -1108,6 +1258,8 @@ window.TitanEye = (function () {
     if (!state.graph || !state.graph.order) return;
     if (!window.confirm("Remove every node and edge from the graph?")) return;
     stopLayout();
+    pushUndo({ kind: "clear", data: state.graph.export(), layers: state.layers,
+               label: "clear " + state.graph.order + " nodes" });
     state.graph.clear();
     state.cursors = {};
     state.layers = {};
@@ -1136,6 +1288,7 @@ window.TitanEye = (function () {
     el.run = $("te-run");
     el.more = $("te-more");
     el.clear = $("te-clear");
+    el.undo = $("te-undo");
     el.back = $("te-back");
     el.tip = $("te-tip");
     el.tipValue = $("te-tip-value");
@@ -1158,6 +1311,8 @@ window.TitanEye = (function () {
     });
     el.more.addEventListener("click", loadMore);
     el.clear.addEventListener("click", clearGraph);
+    el.undo.addEventListener("click", undo);
+    updateUndoButton();
     el.back.addEventListener("click", close);
     el.declutter.addEventListener("click", function () { setDeclutter(!state.declutter.on); });
     el.declutterN.addEventListener("change", function () {
@@ -1199,12 +1354,28 @@ window.TitanEye = (function () {
     });
     document.addEventListener("keydown", function (event) {
       if (el.root.hidden) return;
-      var importOpen = document.getElementById("te-import");
-      if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "f") {
+      /* The analyzer opens over the graph and the grid is a separate page: leave the browser's own
+       * find and undo alone there, and while any dialog is open. */
+      if (window.URLScanAnalyzer && window.URLScanAnalyzer.isOpen()) return;
+      if (document.querySelector(".te-modal:not([hidden])")) return;
+      var typing = /^(input|textarea|select)$/i.test((event.target && event.target.tagName) || "") ||
+        !!(event.target && event.target.isContentEditable);
+      var shortcut = (event.ctrlKey || event.metaKey) && !event.altKey;
+      var letter = (event.key || "").toLowerCase();
+      if (shortcut && letter === "f") {
         /* Take Ctrl+F from the browser only while the graph is on screen. */
-        if (importOpen && !importOpen.hidden) return;
         event.preventDefault();
         openFind();
+      } else if (!shortcut && !event.altKey && (event.key === "Backspace" || event.key === "Delete")) {
+        /* Backspace or Delete removes the selected node (not while typing in a box). */
+        if (typing || !state.selected) return;
+        event.preventDefault();
+        removeNode(state.selected);
+      } else if (shortcut && !event.shiftKey && letter === "z") {
+        /* In a text box Ctrl+Z undoes typing, not the graph. */
+        if (typing) return;
+        event.preventDefault();
+        undo();
       } else if (event.key === "Escape") {
         if (!el.find.hidden) closeFind();
         else close();
@@ -1239,6 +1410,7 @@ window.TitanEye = (function () {
   function loadSnapshot(snap) {
     ensureGraph();
     stopLayout();
+    clearUndo();
     state.graph.clear();
     state.layers = {};
     state.cursors = {};
@@ -1367,6 +1539,7 @@ window.TitanEye = (function () {
     },
     addDetailSection: function (build) { state.detailSections.push(build); },
     onChange: function (listener) { state.listeners.push(listener); },
+    onSelect: function (listener) { state.selectListeners.push(listener); },
     rerenderDetail: function () { renderDetail(); },
     isBusy: function () { return state.busy; }
   };

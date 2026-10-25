@@ -30,6 +30,7 @@ body.te-open { overflow: hidden; }
 .te-bar__select { flex: 0 1 300px; min-width: 180px; width: auto; }
 .te-bar__value { flex: 1 1 260px; min-width: 160px; width: auto; font-family: var(--mono); }
 .te-bar__size { flex: 0 0 84px; width: 84px; }
+.te-bar__undo { margin-left: auto; }
 
 .te-statusbar {
   display: flex;
@@ -61,6 +62,7 @@ body.te-open { overflow: hidden; }
 }
 
 .te-canvas { position: absolute; inset: 0; }
+.te-overlay { position: absolute; top: 0; left: 0; pointer-events: none; }
 
 .te-legend {
   position: absolute;
@@ -92,7 +94,7 @@ body.te-open { overflow: hidden; }
 .te-legend__count { color: var(--ink-faint); }
 
 .te-side {
-  flex: 0 0 360px;
+  flex: 0 0 400px;
   max-width: 42vw;
   overflow-y: auto;
   padding: 16px;
@@ -319,24 +321,15 @@ body.te-open { overflow: hidden; }
 .te-chain__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
 .te-note { margin: 6px 0 0; font-size: 12px; color: var(--ink-faint); overflow-wrap: anywhere; }
 
-/* --- Scale view drawer (titaneye-scale.js, titaneye-crawl.js) ------------ */
-
-.te-drawer {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 4;
-  overflow-y: auto;
-  width: min(440px, 92%);
-  border-right: 1px solid var(--mount-line);
-  background: rgba(6, 19, 43, 0.97);
-  box-shadow: 8px 0 28px rgba(0, 0, 0, 0.35);
-}
+/* --- Scale view, shown in the right-hand panel until a node is selected (titaneye-scale.js) --- */
 
 .te-drawer__head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--mount-line); background: var(--mount-deep); }
 .te-drawer__head h3 { margin: 0 auto 0 0; font-size: 16px; }
 .te-drawer__body { padding: 4px 14px 14px; }
+.te-side .te-drawer__head { position: static; margin: 0 0 8px; padding: 0 0 10px; background: none; }
+.te-side .te-drawer__body { padding: 4px 0 14px; }
+.te-detail__back { margin-bottom: 8px; display: block; }
+.te-crawl__summary { cursor: pointer; font-weight: 600; font-size: 13px; }
 .te-drawer__section { padding: 12px 0; border-bottom: 1px solid var(--mount-line); }
 .te-drawer__section--crawl { padding: 12px 14px 24px; border-top: 1px solid var(--mount-line); border-bottom: 0; }
 .te-drawer__select { margin-bottom: 8px; padding: 6px 8px; }

@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased: TitanEye UI cleanup
+
+### Added
+
+- **Backspace** (or Delete) removes the selected node; Ctrl+Z puts it back.
+- Scan details: **Only add lines to nodes already on the graph** option, which links the site to
+  indicators you already have without adding new nodes.
+- **Undo** button at the top right and **Ctrl+Z**: reverses the last add (expansion, import, scan,
+  crawl step), node removal, node hide or Clear. Keeps the last 50 changes; loading a case starts a new
+  history. Ctrl+Z inside a text box still undoes typing.
+
+### Fixed
+
+- The selected node's lines are drawn above all nodes (sigma draws edges under nodes, so they are redrawn on a
+  transparent canvas overlay).
+- Ctrl+F and Ctrl+Z are left to the browser while the result analyzer or a TitanEye dialog is open.
+
+### Changed
+
+- The scale view is always visible in the right-hand panel and is replaced by a node's details when a
+  node is selected; clicking empty canvas (or **&larr; Scale view**) brings it back. The **Scale view**
+  button is gone from the top bar.
+- The crawler moved into the selected node's detail panel (it starts from the selected node).
+
 ## Unreleased: TitanEye phase 6, scan details
 
 ### Added

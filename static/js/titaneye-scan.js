@@ -19,6 +19,7 @@ window.TitanEyeScan = (function () {
 
   var LAYER = "urlscan";
   var PREF_KEY = "titaneye.scan.categories";
+  var LINK_ONLY_KEY = "titaneye.scan.linkOnly";
   var CONFIRM_NODES = 300;
   var UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -52,6 +53,7 @@ window.TitanEyeScan = (function () {
   var previews = {};   /* scan id -> {fragment, meta, siteId} */
   var chosen = {};     /* site node id -> scan id picked in the select */
   var ticked = null;   /* category -> bool, loaded once from localStorage */
+  var linkOnly = null; /* true: add only lines to nodes already on the graph, no new nodes */
   var busy = false;
 
   function make(tag, className, text) {
@@ -73,11 +75,13 @@ window.TitanEyeScan = (function () {
         if (typeof saved[c[0]] === "boolean") ticked[c[0]] = saved[c[0]];
       });
     } catch (err) { /* storage blocked or corrupt: keep the defaults */ }
+    try { linkOnly = window.localStorage.getItem(LINK_ONLY_KEY) === "1"; } catch (err) { linkOnly = false; }
     return ticked;
   }
 
   function saveTicks() {
     try { window.localStorage.setItem(PREF_KEY, JSON.stringify(ticked)); } catch (err) { /* ignore */ }
+    try { window.localStorage.setItem(LINK_ONLY_KEY, linkOnly ? "1" : "0"); } catch (err) { /* ignore */ }
   }
 
   /* ----------------------------------------------------------------- fetch */
@@ -90,14 +94,24 @@ window.TitanEyeScan = (function () {
     });
   }
 
-  /* Merge the core part (and any ticked categories) of a preview into the graph. */
-  function apply(preview, categories) {
+  /*
+   * Merge the core part (and any ticked categories) of a preview into the graph. With onlyExisting,
+   * nothing new is created: a node is kept only if it is already on the graph, and an edge only
+   * if both of its ends are, so the scan adds lines between things you already have.
+   */
+  function apply(preview, categories, onlyExisting) {
     var wanted = {};
     categories.forEach(function (name) { wanted[name] = true; });
+    var graph = core.graph();
+    var present = function (id) { return !!(graph && graph.hasNode(id)); };
     var include = function (item) { return item.category === "core" || wanted[item.category]; };
     var fragment = {
-      nodes: preview.fragment.nodes.filter(include),
-      edges: preview.fragment.edges.filter(include)
+      nodes: preview.fragment.nodes.filter(function (n) {
+        return include(n) && (!onlyExisting || present(n.id));
+      }),
+      edges: preview.fragment.edges.filter(function (e) {
+        return include(e) && (!onlyExisting || (present(e.source) && present(e.target)));
+      })
     };
     var siteId = preview.meta.site;
     var before = core.graph() ? core.graph().order : 0;
@@ -126,12 +140,34 @@ window.TitanEyeScan = (function () {
     return fresh;
   }
 
+  function countPresent(preview, name) {
+    var graph = core.graph();
+    var here = 0;
+    preview.fragment.nodes.forEach(function (n) {
+      if (n.category === name && graph && graph.hasNode(n.id)) here += 1;
+    });
+    return here;
+  }
+
   function checklist(preview, note, siteId) {
     var box = make("div", "te-scan__list");
     var ticks = loadTicks();
     var boxes = {};
     var counts = preview.meta.categories || {};
     var anyRow = false;
+
+    var only = make("label", "te-import__check");
+    var onlyInput = make("input");
+    onlyInput.type = "checkbox";
+    onlyInput.checked = !!linkOnly;
+    onlyInput.addEventListener("change", function () {
+      linkOnly = onlyInput.checked;
+      saveTicks();
+      core.rerenderDetail();
+    });
+    only.appendChild(onlyInput);
+    only.appendChild(make("span", null, "Only add lines to nodes already on the graph (no new nodes)"));
+    box.appendChild(only);
 
     CATEGORIES.forEach(function (c) {
       var name = c[0];
@@ -146,7 +182,10 @@ window.TitanEyeScan = (function () {
       boxes[name] = input;
       label.appendChild(input);
       var fresh = countNew(preview, name);
-      label.appendChild(make("span", null, c[1] + " (" + total + (fresh !== total ? ", " + fresh + " new" : "") + ")"));
+      var detail = linkOnly
+        ? countPresent(preview, name) + " already on the graph"
+        : total + (fresh !== total ? ", " + fresh + " new" : "");
+      label.appendChild(make("span", null, c[1] + " (" + detail + ")"));
       box.appendChild(label);
     });
 
@@ -159,12 +198,14 @@ window.TitanEyeScan = (function () {
     add.type = "button";
     add.addEventListener("click", function () {
       var names = CATEGORIES.map(function (c) { return c[0]; }).filter(function (n) { return boxes[n] && boxes[n].checked; });
-      var nodeTotal = names.reduce(function (sum, n) { return sum + countNew(preview, n); }, 0);
+      var nodeTotal = linkOnly ? 0 : names.reduce(function (sum, n) { return sum + countNew(preview, n); }, 0);
       if (nodeTotal > CONFIRM_NODES && !window.confirm("This adds about " + nodeTotal + " nodes. Continue?")) return;
-      var result = apply(preview, names);
+      var result = apply(preview, names, linkOnly);
       core.setStatus(
         "Mapped scan " + preview.meta.scan_id.slice(0, 8) + ": " + result.added.nodes + " new nodes, " +
-        result.added.edges + " new edges.", result.added.nodes || result.added.edges ? "ok" : "warn"
+        result.added.edges + " new edges." +
+        (linkOnly && !result.added.edges ? " None of the scan's indicators were already on the graph." : ""),
+        result.added.nodes || result.added.edges ? "ok" : "warn"
       );
       core.select(siteId);
       core.rerenderDetail();

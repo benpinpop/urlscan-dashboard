@@ -585,29 +585,34 @@ window.TitanEyeScale = (function () {
     state.refreshTimer = window.setTimeout(refresh, 400);
   }
 
-  function open() {
-    el.root.hidden = false;
-    refresh();
-  }
-
-  function close() {
-    el.root.hidden = true;
-    core.clearHighlight();
-  }
-
   function init() {
     core = window.TitanEye && window.TitanEye.core;
     el.root = document.getElementById("te-scale");
     el.body = document.getElementById("te-scale-body");
-    var openButton = document.getElementById("te-scale-open");
-    if (!core || !el.root || !el.body || !openButton) return false;
+    if (!core || !el.root || !el.body) return false;
     state.noiseMax = null;
-    openButton.addEventListener("click", function () { if (el.root.hidden) open(); else close(); });
-    document.getElementById("te-scale-close").addEventListener("click", close);
     document.getElementById("te-scale-refresh").addEventListener("click", refresh);
-    core.onChange(scheduleRefresh);
+    el.side = document.getElementById("te-side");
+
+    /* The right-hand panel stays hidden until the graph has data. Once it does, it shows the scale
+     * view until a node is selected; changes made while a node was selected are caught up when
+     * the scale view comes back. */
+    function syncPanel() {
+      var g = core.graph();
+      var empty = !g || !g.order;
+      var changed = el.side && el.side.hidden !== empty;
+      if (el.side) el.side.hidden = empty;
+      el.root.hidden = !!core.selected();
+      if (changed && core.renderer()) core.renderer().resize();
+    }
+    core.onChange(function () { syncPanel(); scheduleRefresh(); });
+    core.onSelect(function (selected) {
+      syncPanel();
+      if (!selected) refresh();
+    });
+    syncPanel();
     return true;
   }
 
-  return { init: init, open: open, close: close, refresh: refresh };
+  return { init: init, refresh: refresh };
 })();
