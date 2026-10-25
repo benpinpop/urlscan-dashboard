@@ -1,0 +1,11 @@
+wallet_address,wallet_chain,site_url_original,site_key,num_sites
+0x719DeA9eA99AdCb55b7f03f2FC5CE9858cB13249,eth,https://www.safepal.com/jp/,safepal.com,4
+0x719DeA9eA99AdCb55b7f03f2FC5CE9858cB13249,Ethereum (ETH) - Ethereum (eth),https://nexbit.1q05.my/,nexbit.1q05.my,4
+0x719DeA9eA99AdCb55b7f03f2FC5CE9858cB13249,Tether (USDT) - Ethereum ERC-20 (eth),https://www.tufejix.com/,tufejix.com,4
+0x81c397C37A375d4EadE6949B0fef01Eb27F40353,Tether (USDT) - Arbitrum One (arb),https://okdc.online/,okdc.online,4
+0x81c397C37A375d4EadE6949B0fef01Eb27F40353,USD Coin (USDC) - Ethereum ERC-20 (eth),https://okdcassets.cc/,okdcassets.cc,4
+0xddae7bc4a8c0f8866c8609355bca368df6d8a513,ETH,https://quantivexholdings.com/,quantivexholdings.com,4
+0x55d398326f99059fF775485246999027B3197955,Tether (USDT) - BNB Smart Chain BEP-20 (bsc),https://shrutkreeti.com/,shrutkreeti.com,3
+TDkAnyGrMH7xfGKdpwoVCzMroCCnbk9um3,Tether (USDT) - Tron TRC-20 (trx),https://nexbit.1q05.my/,nexbit.1q05.my,3
+TDkAnyGrMH7xfGKdpwoVCzMroCCnbk9um3,Tron (TRX) - Tron (trx),https://h5.mabodex.live,h5.mabodex.live,3
+0x719DeA9eA99AdCb55b7f03f2FC5CE9858cB13248,eth,https://broken-wallet.example/,broken-wallet.example,1

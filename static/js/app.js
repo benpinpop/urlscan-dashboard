@@ -542,6 +542,13 @@
 
     node.querySelector(".fact--time dd").textContent = formatTime(result.time);
 
+    var toGraph = node.querySelector(".frame__graph");
+    if (toGraph && result.uuid && window.TitanEyeScan) {
+      toGraph.hidden = false;
+      toGraph.title = "Pull this scan and map its indicators in TitanEye";
+      toGraph.addEventListener("click", function () { window.TitanEyeScan.addScan(result.uuid); });
+    }
+
     var analyze = node.querySelector(".frame__analyze");
     if (result.uuid && window.URLScanAnalyzer) {
       analyze.title = "Open this scan in the result analyzer";
@@ -1110,6 +1117,11 @@
         runSearch(false);
       },
       onReport: reporter ? function (siteUrl) { reporter.open({ siteUrl: siteUrl }); } : null,
+      onAddToGraph: function (uuid) {
+        if (!window.TitanEyeScan) return;
+        window.URLScanAnalyzer.close();
+        window.TitanEyeScan.addScan(uuid);
+      },
       checkSite: reporter ? reporter.describeCheck : null,
       hasScambustersKey: reporter ? reporter.isKeyValid : null,
       onAddScambustersKey: reporter ? function () { reporter.open({ focusKey: true }); } : null
@@ -1125,6 +1137,40 @@
     el.keyForget.addEventListener("click", function () { window.URLScanAnalyzer.clearCache(); });
   } else if (el.openAnalyzer) {
     el.openAnalyzer.hidden = true;
+  }
+
+  /* TitanEye graph workspace (static/js/titaneye.js). Optional like the analyzer. */
+  var teOpen = document.getElementById("te-open");
+  if (window.TitanEye && teOpen) {
+    window.TitanEye.init({
+      getKey: currentKey,
+      onSearch: function (query) {
+        window.TitanEye.close();
+        el.query.value = query;
+        el.filter.value = "";
+        runSearch(false);
+      },
+      onAnalyze: function (uuid) {
+        if (window.URLScanAnalyzer) window.URLScanAnalyzer.open(uuid);
+      }
+    });
+    var importOpen = document.getElementById("te-import-open");
+    if (window.TitanEyeImport && window.TitanEyeImport.init() && importOpen) {
+      importOpen.addEventListener("click", function () { window.TitanEyeImport.open(); });
+    } else if (importOpen) {
+      importOpen.hidden = true;
+    }
+    var walletKeys = document.getElementById("te-keys-open");
+    if (!(window.TitanEyeWallet && window.TitanEyeWallet.init()) && walletKeys) walletKeys.hidden = true;
+    [["te-scale-open", window.TitanEyeScale], ["te-cases-open", window.TitanEyeCases]].forEach(function (pair) {
+      var button = document.getElementById(pair[0]);
+      if (!(pair[1] && pair[1].init()) && button) button.hidden = true;
+    });
+    if (window.TitanEyeCrawl) window.TitanEyeCrawl.init();
+    if (window.TitanEyeLayout) window.TitanEyeLayout.init();
+    if (window.TitanEyeScan) window.TitanEyeScan.init();
+    teOpen.hidden = false;
+    teOpen.addEventListener("click", function () { window.TitanEye.open(); });
   }
 
   var validityReporter = window.ScambustersReporter || null;

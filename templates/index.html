@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/analyzer.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/scambusters.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/titaneye.css') }}">
 <link rel="icon" href="data:,">
 </head>
 <body>
@@ -17,6 +18,7 @@
     <h1>Query Visualizer</h1>
     <p>Visualize and analyze your search queries. Powered by URLScan.io</p>
     <nav class="sheet-head__tools" aria-label="Tools">
+      <button type="button" id="te-open" class="btn btn--primary btn--small" aria-controls="titaneye" hidden>TitanEye graph</button>
       <button type="button" id="sb-open" class="btn btn--small sb-open" aria-haspopup="dialog"
               aria-controls="sb-panel" hidden>Report scam</button>
             <button type="button" id="sb-key-open" class="btn btn--ghost btn--small" aria-haspopup="dialog"
@@ -258,6 +260,7 @@
         </div>
       </div>
       <button type="button" class="btn btn--ghost btn--small frame__analyze">Analyze result</button>
+      <button type="button" class="btn btn--ghost btn--small frame__graph" hidden>Add scan to TitanEye</button>
       <div class="frame__scambusters" hidden>
         <button type="button" class="btn btn--ghost btn--small frame__sb-check">Check ScamBusters</button>
         <button type="button" class="btn btn--small frame__sb-report">Report</button>
@@ -272,6 +275,195 @@
     </div>
   </article>
 </template>
+
+<!-- TitanEye graph workspace. Contents are built by static/js/titaneye.js from
+     server-shaped nodes and edges; nothing here carries scan data. -->
+<section class="te" id="titaneye" hidden aria-label="TitanEye graph workspace"
+         data-worker="{{ url_for('static', filename='vendor/forceatlas2.worker.js') }}">
+  <div class="te-bar">
+    <button type="button" id="te-back" class="btn btn--ghost btn--small">&larr; Back to search</button>
+    <h2 class="te-bar__title">TitanEye</h2>
+    <label class="sr-only" for="te-transform">Expansion type</label>
+    <select id="te-transform" class="field te-bar__select"></select>
+    <label class="sr-only" for="te-value">Value or urlscan query</label>
+    <input type="text" id="te-value" class="field te-bar__value" spellcheck="false" autocomplete="off"
+           placeholder="Value, e.g. 203.0.113.42, or a urlscan query">
+    <label class="sr-only" for="te-size">Results per expansion</label>
+    <select id="te-size" class="field te-bar__size">
+      <option value="25">25</option>
+      <option value="100" selected>100</option>
+      <option value="250">250</option>
+      <option value="500">500</option>
+      <option value="1000">1000</option>
+      <option value="5000">5000</option>
+      <option value="10000">10000</option>
+    </select>
+    <button type="button" id="te-run" class="btn btn--primary btn--small">Add to graph</button>
+    <button type="button" id="te-more" class="btn btn--small" hidden>Load next page</button>
+    <span class="te-declutter" role="group" aria-label="Declutter">
+      <button type="button" id="te-declutter" class="btn btn--small" aria-pressed="false"
+              title="Hide sites with fewer connections than the number on the right">Declutter</button>
+      <label class="te-declutter__n">
+        <span class="sr-only">Hide sites with fewer connections than</span>
+        <span aria-hidden="true">under</span>
+        <input type="number" id="te-declutter-n" class="field" min="1" max="10" value="2" inputmode="numeric">
+        <span aria-hidden="true">links</span>
+      </label>
+    </span>
+    <label class="sr-only" for="te-layout-preset">Layout</label>
+    <select id="te-layout-preset" class="field te-bar__layout">
+      <option value="organic">Organic layout</option>
+      <option value="rings">Rings by kind</option>
+      <option value="hierarchy">Hierarchy (ASN, IP, site)</option>
+    </select>
+    <button type="button" id="te-tidy" class="btn btn--small" title="Re-arrange the nodes that are showing">Tidy</button>
+    <label class="sr-only" for="te-edges">Edges</label>
+    <select id="te-edges" class="field te-bar__layout" title="Which lines to draw">
+      <option value="auto">Edges: auto</option>
+      <option value="all">Edges: all</option>
+      <option value="selection">Edges: selection only</option>
+      <option value="none">Edges: none</option>
+    </select>
+    <button type="button" id="te-import-open" class="btn btn--small" aria-haspopup="dialog" aria-controls="te-import">Import dataset</button>
+    <button type="button" id="te-scale-open" class="btn btn--small" aria-controls="te-scale">Scale view</button>
+    <button type="button" id="te-cases-open" class="btn btn--small" aria-haspopup="dialog" aria-controls="te-cases">Cases &amp; export</button>
+    <button type="button" id="te-keys-open" class="btn btn--ghost btn--small" aria-haspopup="dialog" aria-controls="te-keys">Keys</button>
+    <button type="button" id="te-find-open" class="btn btn--ghost btn--small" title="Find on the graph (Ctrl+F)">Find</button>
+    <button type="button" id="te-clear" class="btn btn--ghost btn--small">Clear</button>
+  </div>
+  <div class="te-statusbar">
+    <p class="te-status" id="te-status" role="status" aria-live="polite">Pick an expansion type and a value to start the graph.</p>
+    <span class="te-summary" id="te-summary"></span>
+    <span class="te-summary" id="te-layout-note"></span>
+  </div>
+  <div class="te-body">
+    <div class="te-stage">
+      <div class="te-canvas" id="te-canvas"></div>
+      <div class="te-tip" id="te-tip" hidden role="tooltip">
+        <div class="te-tip__value" id="te-tip-value"></div>
+        <div class="te-tip__meta" id="te-tip-meta"></div>
+      </div>
+      <aside class="te-drawer" id="te-scale" hidden aria-label="Scale view">
+        <div class="te-drawer__head">
+          <h3>Scale view</h3>
+          <button type="button" id="te-scale-refresh" class="btn btn--ghost btn--small">Refresh</button>
+          <button type="button" id="te-scale-close" class="btn btn--ghost btn--small" aria-label="Close scale view">&times;</button>
+        </div>
+        <div class="te-drawer__body" id="te-scale-body"></div>
+        <div class="te-drawer__section te-drawer__section--crawl" id="te-crawl-slot"></div>
+      </aside>
+      <div class="te-find" id="te-find" role="search" hidden>
+        <div class="te-find__row">
+          <label class="sr-only" for="te-find-input">Find on the graph</label>
+          <input type="search" id="te-find-input" class="field te-find__input" spellcheck="false" autocomplete="off"
+                 placeholder="Find a value, IP, wallet, scan ID. Try type:ip 203.0">
+          <span class="te-find__count" id="te-find-count" aria-live="polite"></span>
+          <button type="button" id="te-find-prev" class="btn btn--ghost btn--small" aria-label="Previous match">&uarr;</button>
+          <button type="button" id="te-find-next" class="btn btn--ghost btn--small" aria-label="Next match">&darr;</button>
+          <button type="button" id="te-find-close" class="btn btn--ghost btn--small" aria-label="Close find">&times;</button>
+        </div>
+        <ul class="te-find__list" id="te-find-list"></ul>
+      </div>
+      <div class="te-legend te-legend--layers" id="te-layers" role="group" aria-label="Show or hide datasets" hidden></div>
+      <div class="te-legend" id="te-legend" role="group" aria-label="Show or hide node types"></div>
+    </div>
+    <aside class="te-side" aria-label="Node details">
+      <div id="te-detail"></div>
+    </aside>
+  </div>
+  <div class="te-modal" id="te-cases" hidden role="dialog" aria-modal="true" aria-labelledby="te-cases-title">
+    <div class="te-modal__box">
+      <div class="te-modal__head">
+        <h3 id="te-cases-title">Cases and export</h3>
+        <button type="button" id="te-cases-close" class="btn btn--ghost btn--small" aria-label="Close">&times;</button>
+      </div>
+      <div class="te-modal__scroll">
+        <h4 class="te-import__h">Save the graph as a case</h4>
+        <p class="te-import__note">A case holds the graph, its layout and which datasets are on. It never holds an API key.</p>
+        <div class="te-cases__save">
+          <label class="sr-only" for="te-case-name">Case name</label>
+          <input type="text" id="te-case-name" class="field" maxlength="80" autocomplete="off" placeholder="Case name">
+          <button type="button" id="te-case-save" class="btn btn--primary btn--small">Save in this browser</button>
+          <button type="button" id="te-case-download" class="btn btn--small">Download case file</button>
+          <label class="btn btn--ghost btn--small te-cases__file">Load case file
+            <input type="file" id="te-case-file" accept=".json,application/json">
+          </label>
+        </div>
+        <div id="te-case-list"></div>
+
+        <h4 class="te-import__h">Export</h4>
+        <label class="te-import__check">
+          <input type="checkbox" id="te-export-shown">
+          <span>Only nodes currently shown (respects filters, datasets and hidden nodes)</span>
+        </label>
+        <div class="te-cases__save">
+          <button type="button" id="te-export-nodes" class="btn btn--small">Nodes CSV</button>
+          <button type="button" id="te-export-edges" class="btn btn--small">Edges CSV</button>
+          <button type="button" id="te-export-iocs" class="btn btn--small">Indicator list (CSV)</button>
+          <button type="button" id="te-export-graphml" class="btn btn--small">GraphML (Gephi, Maltego)</button>
+        </div>
+      </div>
+      <div class="te-modal__foot">
+        <p class="te-import__status" id="te-cases-status" role="status" aria-live="polite"></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="te-modal" id="te-keys" hidden role="dialog" aria-modal="true" aria-labelledby="te-keys-title">
+    <div class="te-modal__box te-modal__box--narrow">
+      <div class="te-modal__head">
+        <h3 id="te-keys-title">Chain provider keys</h3>
+        <button type="button" id="te-keys-close" class="btn btn--ghost btn--small" aria-label="Close">&times;</button>
+      </div>
+      <div class="te-modal__scroll">
+        <p class="te-import__note">
+          Keys are kept in this page's memory only. They are not saved to this browser, to cases, to
+          exports or to the server, and they are forgotten when you reload or close the page. Each lookup
+          sends the key to this server for that one request.
+        </p>
+        <div class="te-keys__row">
+          <label for="te-key-etherscan">Etherscan (Ethereum, Arbitrum, Polygon and other EVM chains)</label>
+          <input type="password" id="te-key-etherscan" class="field" autocomplete="off" spellcheck="false" data-lpignore="true" placeholder="Etherscan API key">
+          <span class="te-keys__badge" id="te-key-etherscan-state"></span>
+        </div>
+        <div class="te-keys__row">
+          <label for="te-key-tronscan">Tronscan (Tron)</label>
+          <input type="password" id="te-key-tronscan" class="field" autocomplete="off" spellcheck="false" data-lpignore="true" placeholder="Tronscan API key">
+          <span class="te-keys__badge" id="te-key-tronscan-state"></span>
+        </div>
+        <div class="te-keys__row">
+          <label for="te-key-blockchain">Blockchain.com (Bitcoin), optional</label>
+          <input type="password" id="te-key-blockchain" class="field" autocomplete="off" spellcheck="false" data-lpignore="true" placeholder="Blockchain.com API code (optional)">
+          <span class="te-keys__badge" id="te-key-blockchain-state"></span>
+        </div>
+      </div>
+      <div class="te-modal__foot">
+        <button type="button" id="te-keys-clear" class="btn btn--ghost btn--small">Clear all keys</button>
+        <span class="te-import__status"></span>
+        <button type="button" id="te-keys-save" class="btn btn--primary btn--small">Use for this session</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="te-modal" id="te-import" hidden role="dialog" aria-modal="true" aria-labelledby="te-import-title">
+    <div class="te-modal__box">
+      <div class="te-modal__head">
+        <h3 id="te-import-title">Import dataset</h3>
+        <button type="button" id="te-import-close" class="btn btn--ghost btn--small" aria-label="Close">&times;</button>
+      </div>
+      <div class="te-drop" id="te-drop">
+        <label for="te-file" class="te-drop__label">Drop a CSV, TSV, TXT, JSON or JSONL file here, or choose one</label>
+        <input type="file" id="te-file" accept=".csv,.tsv,.txt,.json,.jsonl,text/csv,text/plain,application/json">
+      </div>
+      <div class="te-modal__scroll" id="te-import-body"></div>
+      <div class="te-modal__foot">
+        <p class="te-import__status" id="te-import-status" role="status" aria-live="polite"></p>
+        <button type="button" id="te-import-check" class="btn btn--small" hidden>Validate data</button>
+        <button type="button" id="te-import-add" class="btn btn--primary btn--small" hidden>Add to graph</button>
+      </div>
+    </div>
+  </div>
+</section>
 
 <!-- Result analyzer. Everything inside is built by static/js/analyzer.js; the
      markup here is only the shell, so the panel has no server-rendered data in it. -->
@@ -289,6 +481,7 @@
     <span id="an-verdict-chip"></span>
     <a id="an-report" class="btn btn--ghost btn--small" target="_blank"
        rel="noopener noreferrer" hidden>urlscan.io report</a>
+    <button type="button" id="an-graph" class="btn btn--ghost btn--small" hidden>Add scan to TitanEye</button>
     <button type="button" id="an-sb-check" class="btn btn--ghost btn--small" hidden>Check Scambusters</button>
     <button type="button" id="an-sb-report" class="btn btn--small sb-open" hidden>Report to Scambusters</button>
     <button type="button" id="an-sb-add-key" class="btn btn--ghost btn--small an-sb-add-key" hidden>Add API key</button>
@@ -421,6 +614,17 @@
 <script src="{{ url_for('static', filename='js/autocomplete.js') }}" defer></script>
 <script src="{{ url_for('static', filename='js/analyzer.js') }}" defer></script>
 <script src="{{ url_for('static', filename='js/scambusters.js') }}" defer></script>
+<script src="{{ url_for('static', filename='vendor/graphology.umd.min.js') }}" defer></script>
+<script src="{{ url_for('static', filename='vendor/sigma.min.js') }}" defer></script>
+<script src="{{ url_for('static', filename='vendor/forceatlas2.min.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/titaneye.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/titaneye-import.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/titaneye-wallet.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/titaneye-scale.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/titaneye-crawl.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/titaneye-cases.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/titaneye-layout.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/titaneye-scan.js') }}" defer></script>
 <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
 </body>
 </html>

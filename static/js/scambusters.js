@@ -817,6 +817,24 @@ window.ScambustersReporter = (function () {
         hideResult();
       }
     }
+    if (Array.isArray(options.wallets)) {
+      /* Prefill wallets (TitanEye): reuse an empty row first, then add rows. */
+      options.wallets.slice(0, state.maxWallets).forEach(function (wallet) {
+        if (!wallet || typeof wallet.address !== "string") return;
+        var empty = rows().filter(function (row) { return !rowParts(row).address.value.trim(); })[0];
+        if (!empty) {
+          addRow({ address: wallet.address, chain: wallet.chain });
+          return;
+        }
+        var parts = rowParts(empty);
+        parts.address.value = wallet.address;
+        if (wallet.chain) {
+          parts.chain.value = wallet.chain;
+          empty.setAttribute("data-user-chose", "");
+        }
+        checkRow(empty);
+      });
+    }
     el.panel.hidden = false;
     paintKey();
     if (options.focusKey || !readKey()) editKey(true);

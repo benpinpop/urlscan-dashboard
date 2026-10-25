@@ -1,0 +1,7 @@
+site_url,ip,wallet_address,wallet_chain
+https://www.a1.com/,10.0.0.1,0xabc0000000000000000000000000000000000001,eth
+https://a2.com/,10.0.0.1,0xabc0000000000000000000000000000000000001,eth
+https://a3.com/,10.0.0.1,0xabc0000000000000000000000000000000000001,eth
+https://solo.net/,,,
+https://pair.org/,10.0.0.2,,
+https://lone-ip.io/,10.0.0.3,,

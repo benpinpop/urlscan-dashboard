@@ -69,6 +69,17 @@ class Config:
     # per student (50 submissions/min; 50 checks/min and 500/h).
     SCAMBUSTERS_RATE_LIMIT_PER_MINUTE = _as_int(os.environ.get("SCAMBUSTERS_RATE_LIMIT_PER_MINUTE"), 120)
 
+    # --- TitanEye on-chain lookups -----------------------------------------
+    # Provider keys are typed in the browser and sent per request; there are
+    # deliberately no key settings here.
+    ETHERSCAN_BASE_URL = os.environ.get("ETHERSCAN_BASE_URL", "https://api.etherscan.io/v2/api")
+    BLOCKCHAIN_BASE_URL = os.environ.get("BLOCKCHAIN_BASE_URL", "https://blockchain.info")
+    TRONSCAN_BASE_URL = os.environ.get("TRONSCAN_BASE_URL", "https://apilist.tronscanapi.com")
+    CHAIN_TIMEOUT = max(1, _as_int(os.environ.get("CHAIN_TIMEOUT"), 20))
+    CHAIN_RATE_LIMIT_PER_MINUTE = _as_int(os.environ.get("CHAIN_RATE_LIMIT_PER_MINUTE"), 20)
+    CHAIN_CACHE_TTL = max(0, _as_int(os.environ.get("CHAIN_CACHE_TTL"), 300))
+    CHAIN_CACHE_MAX_ENTRIES = max(1, _as_int(os.environ.get("CHAIN_CACHE_MAX_ENTRIES"), 256))
+
     # --- Abuse controls --------------------------------------------------
     RATE_LIMIT_PER_MINUTE = _as_int(os.environ.get("RATE_LIMIT_PER_MINUTE"), 30)
     RATE_LIMIT_PER_HOUR = _as_int(os.environ.get("RATE_LIMIT_PER_HOUR"), 400)

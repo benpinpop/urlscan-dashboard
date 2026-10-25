@@ -22,7 +22,7 @@ window.URLScanAnalyzer = (function () {
 
   /* onReport(siteUrl) and checkSite(siteUrl) -> Promise<{tone, title, detail, action}>
      are optional: without them the Scambusters buttons stay hidden. */
-  var hooks = { getKey: null, onPivot: null, onReport: null, checkSite: null, hasScambustersKey: null, onAddScambustersKey: null };
+  var hooks = { getKey: null, onPivot: null, onReport: null, onAddToGraph: null, checkSite: null, hasScambustersKey: null, onAddScambustersKey: null };
 
   var state = {
     uuid: null,
@@ -1672,6 +1672,7 @@ window.URLScanAnalyzer = (function () {
     el.panelTitle = document.getElementById("an-panel-title");
     el.panelBody = document.getElementById("an-panel-body");
     el.panelClose = document.getElementById("an-panel-close");
+    el.graph = document.getElementById("an-graph");
     el.sbCheck = document.getElementById("an-sb-check");
     el.sbReport = document.getElementById("an-sb-report");
     el.sbAddKey = document.getElementById("an-sb-add-key");
@@ -1679,6 +1680,12 @@ window.URLScanAnalyzer = (function () {
 
     el.back.addEventListener("click", close);
     if (el.sbCheck) el.sbCheck.addEventListener("click", checkScambusters);
+    if (el.graph) {
+      el.graph.addEventListener("click", function () {
+        var uuid = state.data && state.data.summary && state.data.summary.uuid;
+        if (uuid && typeof hooks.onAddToGraph === "function") hooks.onAddToGraph(uuid);
+      });
+    }
     if (el.sbReport) {
       el.sbReport.addEventListener("click", function () {
         if (typeof hooks.onReport === "function" && state.data) hooks.onReport(scanSiteUrl(state.data.summary));
@@ -1835,6 +1842,10 @@ window.URLScanAnalyzer = (function () {
   }
 
   function paintScambusters() {
+    if (el.graph) {
+      el.graph.hidden = !(state.data && state.data.summary && state.data.summary.uuid &&
+                          typeof hooks.onAddToGraph === "function");
+    }
     if (!el.sbCheck) return;
     var site = state.data ? scanSiteUrl(state.data.summary) : "";
     var hasKey = typeof hooks.hasScambustersKey === "function" && hooks.hasScambustersKey();
@@ -1952,6 +1963,7 @@ window.URLScanAnalyzer = (function () {
     };
     hooks.onPivot = options.onPivot || null;
     hooks.onReport = options.onReport || null;
+    hooks.onAddToGraph = options.onAddToGraph || null;
     hooks.checkSite = options.checkSite || null;
     hooks.hasScambustersKey = options.hasScambustersKey || null;
     hooks.onAddScambustersKey = options.onAddScambustersKey || null;

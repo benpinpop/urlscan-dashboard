@@ -1,5 +1,99 @@
 # Changelog
 
+## Unreleased: TitanEye phase 6, scan details
+
+### Added
+
+- `POST /api/graph/site`: pulls a full urlscan result and maps hashes, filenames, third-party domains
+  and their IPs, the TLS issuer, technologies, Telegram contacts, wallets in links, brands, tags and
+  redirect hops (`graph_builder.shape_scan`).
+- **Scan details** section on site nodes: pull the scan, tick what to add, add it. Choices are
+  remembered per category.
+- **Add scan to TitanEye** button on each results-grid frame and in the analyzer header.
+- `static/js/titaneye-scan.js`; tests for scan shaping, caps, hostile strings and the route.
+
+## Unreleased: TitanEye declutter and tidy layout
+
+### Added
+
+- **Declutter** button and number box: hides sites with fewer than N connections (default 2), plus
+  anything left with no visible neighbour by that. Composes with the other filters, never hides the
+  selected node or search matches, and is saved in cases.
+- **Tidy** with three presets (organic, rings by kind, hierarchy). The organic layout fans out leaves,
+  removes overlaps and packs disconnected pieces; expanding a node no longer moves existing nodes.
+- Edge display list (auto, all, selection only, none), hover tooltip with the full value, and label
+  settings that follow graph size.
+- `static/js/titaneye-layout.js`; `tests/fixtures/titaneye_declutter.csv`.
+
+### Changed
+
+- A leading `www.` is dropped from site names (`graph_builder.strip_www`), in imports and in urlscan
+  expansions, so `www.example.com` and `example.com` are one node. Saved cases keep the names they had.
+- A cluster now needs at least three sites (was two).
+- Force layout uses LinLog mode and a higher scaling ratio, which cut overlapping dots by more than half
+  on the test data. Sigma is created with `allowInvalidContainer` so a frame queued as the panel closes
+  cannot throw.
+
+## Unreleased: TitanEye wallet intel and scale tools, phases 3 and 4
+
+### Added
+
+- Wallet intel: `chain_providers/` (Etherscan V2, Blockchain.com, Tronscan), `GET /api/chain/providers`,
+  `POST /api/chain/summary`, and an on-chain section in a wallet node's detail panel. Keys are entered in
+  a Keys panel, held in memory only and never stored or logged; the log scrubber also redacts `apikey=`
+  and `api_code=`.
+- Scale view drawer: overview, hosting-concentration map, rankings, clusters of sites that share an
+  indicator, a noise filter for shared infrastructure and a timeline filter with playback.
+- Crawler: bounded, cancellable and resumable walk outward from a selected node.
+- Cases and export: saved cases (IndexedDB) and case files, nodes/edges CSV, indicator list, GraphML.
+- Scambusters: a site node can open the reporter with its linked wallets filled in
+  (`ScambustersReporter.open` accepts `wallets`).
+- `TitanEye.core`, a small API the add-on files use; `tests/test_chain.py` (24 tests); 161 in total.
+
+### Decisions
+
+- Tronscan was added because it was needed for Tron wallets and answers 401 without a key.
+- EVM chains show the sent-transaction count (nonce) because totals are not available from the free
+  Etherscan endpoints.
+
+## Unreleased: TitanEye find (Ctrl+F)
+
+- Find box on the graph: matches a node's value, id, type and attributes, supports `type:<node type>`,
+  highlights matches, steps with Enter / Shift+Enter, lists the first 40 results. See
+  `docs/TITANEYE.md`.
+
+## Unreleased: TitanEye dataset import, phase 2
+
+### Added
+
+- Import dataset dialog in the graph: CSV/TSV/TXT/JSON/JSONL read in the browser, column mapper with
+  saved presets, validation preview, then add to the graph as a named layer.
+- `POST /api/graph/ingest` and `graph_builder.ingest`: URL/host normalisation (defanging, `//host`,
+  ports, IDNA, registrable domain) and wallet validation with chain labels like
+  `Tether (USDT) - Arbitrum One (arb)`.
+- Layer toggles per data source; `TitanEye.addFragment` and `uniqueLayerName`.
+- `tests/fixtures/titaneye_*.csv`; 8 more tests (137 in total).
+
+## Unreleased: TitanEye graph workspace, phase 1
+
+A Maltego-style graph view. Plan: `docs/GRAPH_PLATFORM_PROMPT.md`; contract: `docs/TITANEYE.md`.
+
+### Added
+
+- `graph_builder.py`: node/edge ids, a fixed transform table (19 transforms plus a free-form
+  query), per-type value validation, and shaping of search hits into linked nodes and edges.
+- `GET /api/graph/transforms`, `POST /api/graph/expand` in `app.py`.
+- `static/js/titaneye.js`, `static/css/titaneye.css`, `#titaneye` shell and a **TitanEye graph**
+  header button: sigma.js rendering, ForceAtlas2 layout in a worker, type legend/filter, node detail
+  panel with expand, "Open scan in analyzer" and "Search this domain in the grid".
+- `static/vendor/`: graphology, sigma, ForceAtlas2 (main thread and worker), with licences.
+- `tests/test_graph.py` (16 tests); 129 tests in total.
+
+### Decisions
+
+- Vendored builds instead of a CDN because the CSP allows only same-origin scripts.
+- Transforms are an allow-list; the browser sends a transform id and value, never a field name.
+
 ## Unreleased: Export by report status
 
 With a reported-sites CSV imported, the Export menu can include or exclude Reported and Unreported

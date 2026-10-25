@@ -24,8 +24,22 @@ try:  # optional convenience, not required in production
 except ImportError:  # pragma: no cover
     pass
 
+from chain_providers import ProviderError
+from chain_providers.blockchain import BlockchainProvider
+from chain_providers.etherscan import EtherscanProvider
+from chain_providers.tronscan import TronscanProvider
 from config import Config
 from domain_intel import DomainTable
+from graph_builder import (
+    MAX_INGEST_BATCH,
+    GraphInputError,
+    build_query,
+    catalog,
+    ingest,
+    node_id,
+    shape_expansion,
+    shape_scan,
+)
 from keyword_db import KeywordDatabase
 from query_terms import QueryTerms
 from rate_limit import RateLimiter
@@ -54,6 +68,7 @@ from wallet_validation import CHAINS, EVM_CHAINS, OTHER_CHAINS, detect_chain, va
 KEY_SHAPE = re.compile(
     r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b"
     r"|\bsb_[A-Za-z0-9_\-]{8,}"  # Scambusters keys
+    r"|(?i:\b(?:apikey|api_code)=[^&\s\"']+)"  # Etherscan / Blockchain.com keys in a URL
 )
 
 
@@ -92,6 +107,12 @@ limiter = RateLimiter(
     per_minute=Config.RATE_LIMIT_PER_MINUTE,
     per_hour=Config.RATE_LIMIT_PER_HOUR,
 )
+chain_limiter = RateLimiter(per_minute=Config.CHAIN_RATE_LIMIT_PER_MINUTE, per_hour=0)
+CHAIN_PROVIDERS = {
+    "etherscan": EtherscanProvider(Config.ETHERSCAN_BASE_URL, timeout=Config.CHAIN_TIMEOUT),
+    "blockchain": BlockchainProvider(Config.BLOCKCHAIN_BASE_URL, timeout=Config.CHAIN_TIMEOUT),
+    "tronscan": TronscanProvider(Config.TRONSCAN_BASE_URL, timeout=Config.CHAIN_TIMEOUT),
+}
 scambusters_client = ScambustersClient(Config.SCAMBUSTERS_BASE_URL, timeout=Config.SCAMBUSTERS_TIMEOUT)
 # Separate budget so reporting never eats into the urlscan search allowance.
 scambusters_limiter = RateLimiter(per_minute=Config.SCAMBUSTERS_RATE_LIMIT_PER_MINUTE, per_hour=0)
@@ -290,6 +311,18 @@ REQUIRED_ASSETS = (
     "static/js/autocomplete.js",
     "static/js/analyzer.js",
     "static/js/scambusters.js",
+    "static/js/titaneye.js",
+    "static/js/titaneye-import.js",
+    "static/js/titaneye-wallet.js",
+    "static/js/titaneye-scale.js",
+    "static/js/titaneye-crawl.js",
+    "static/js/titaneye-cases.js",
+    "static/js/titaneye-layout.js",
+    "static/css/titaneye.css",
+    "static/vendor/sigma.min.js",
+    "static/vendor/graphology.umd.min.js",
+    "static/vendor/forceatlas2.min.js",
+    "static/vendor/forceatlas2.worker.js",
 )
 
 
@@ -458,6 +491,273 @@ def search():
             },
         }
     )
+
+
+# --------------------------------------------------------------------------
+# TitanEye graph
+# --------------------------------------------------------------------------
+
+GRAPH_MAX_EXPAND = 10000
+# Dataset imports send many small batches and never reach urlscan, so they get their
+# own generous budget instead of eating the search allowance.
+ingest_limiter = RateLimiter(per_minute=3000, per_hour=0)
+
+
+@app.route("/api/graph/transforms")
+def graph_transforms():
+    limited = enforce_rate_limit()
+    if limited:
+        return limited
+    return jsonify({"ok": True, "transforms": catalog(), "max_expand": GRAPH_MAX_EXPAND})
+
+
+@app.route("/api/graph/expand", methods=["POST"])
+def graph_expand():
+    limited = enforce_rate_limit()
+    if limited:
+        return limited
+
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return fail("Send a JSON body with transform and value.", 400, "invalid_body")
+
+    transform_id = body.get("transform")
+    value = body.get("value")
+    if not isinstance(transform_id, str) or not isinstance(value, str):
+        return fail("transform and value must be text.", 400, "invalid_body")
+    try:
+        query, transform, canonical = build_query(transform_id, value)
+    except GraphInputError as exc:
+        return fail(str(exc), 400, "invalid_graph_value")
+    if len(query) > Config.MAX_QUERY_LENGTH:
+        return fail(
+            f"Query is too long. Keep it under {Config.MAX_QUERY_LENGTH} characters.",
+            400,
+            "query_too_long",
+        )
+
+    size = body.get("size", 100)
+    if (
+        isinstance(size, bool)
+        or not isinstance(size, int)
+        or size not in Config.ALLOWED_SIZES
+        or size > GRAPH_MAX_EXPAND
+    ):
+        allowed = ", ".join(str(s) for s in Config.ALLOWED_SIZES if s <= GRAPH_MAX_EXPAND)
+        return fail(f"size must be one of: {allowed}.", 400, "invalid_size")
+
+    cursor = body.get("search_after") or ""
+    if cursor:
+        parts = cursor.split(",") if isinstance(cursor, str) else []
+        if (
+            not parts
+            or len(parts) > Config.MAX_CURSOR_PARTS
+            or not all(CURSOR_SHAPE.match(part) for part in parts)
+        ):
+            return fail("Pagination cursor is not valid. Run the expansion again.", 400, "invalid_cursor")
+
+    api_key, error = resolve_api_key()
+    if error:
+        return error
+
+    try:
+        payload = client.search(api_key, query, size, cursor or None)
+    except UrlscanError as exc:
+        log.info("graph expand rejected upstream: %s (%s)", exc.code, exc.status)
+        extra = {"retry_after": exc.retry_after} if exc.retry_after else {}
+        return fail(exc.message, exc.status, exc.code, **extra)
+
+    raw_results = payload.get("results") or []
+    rows = [normalise_result(item, i + 1) for i, item in enumerate(raw_results)]
+    fragment = shape_expansion(rows, query, transform, canonical)
+    has_more = bool(payload.get("has_more"))
+    total = payload.get("total")
+    return jsonify(
+        {
+            "ok": True,
+            **fragment,
+            "meta": {
+                "query": query,
+                "transform": transform.id if transform else "query",
+                "seed": node_id(transform.node_type, canonical) if transform else None,
+                "count": len(rows),
+                "total": total,
+                "total_is_exact": isinstance(total, int) and total <= 10000,
+                "has_more": has_more,
+                "next_cursor": build_cursor(raw_results) if has_more else None,
+            },
+        }
+    )
+
+
+@app.route("/api/graph/site", methods=["POST"])
+def graph_site():
+    """Pull one full scan and map its indicators (hashes, filenames, domains, ...) as a fragment."""
+    limited = enforce_rate_limit()
+    if limited:
+        return limited
+
+    body = request.get_json(silent=True)
+    scan_id = body.get("scan_id") if isinstance(body, dict) else None
+    if not isinstance(scan_id, str):
+        return fail("Send a JSON body with a scan_id.", 400, "invalid_body")
+    invalid = validate_uuid(scan_id)
+    if invalid:
+        return invalid
+
+    api_key, error = resolve_api_key()
+    if error:
+        return error
+
+    document, error, cached = fetch_result(scan_id, api_key)
+    if error:
+        return error
+    try:
+        fragment = shape_scan(document, scan_id)
+    except GraphInputError as exc:
+        return fail(str(exc), 422, "scan_unusable")
+    fragment["meta"]["cached"] = cached
+    return jsonify({"ok": True, **fragment})
+
+
+@app.route("/api/graph/ingest", methods=["POST"])
+def graph_ingest():
+    """Normalise one batch of uploaded sites and wallets. Needs no urlscan key."""
+    allowed, retry_after = ingest_limiter.check(client_identity())
+    if not allowed:
+        return fail(
+            f"Too many import requests from this address. Try again in {retry_after} seconds.",
+            429,
+            "local_rate_limited",
+            retry_after=retry_after,
+        )
+
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return fail("Send a JSON body with sites and wallets.", 400, "invalid_body")
+    sites = body.get("sites", [])
+    wallets = body.get("wallets", [])
+    if not isinstance(sites, list) or not isinstance(wallets, list):
+        return fail("sites and wallets must be lists.", 400, "invalid_body")
+    if len(sites) > MAX_INGEST_BATCH or len(wallets) > MAX_INGEST_BATCH:
+        return fail(f"Send at most {MAX_INGEST_BATCH} items per list per request.", 400, "batch_too_large")
+
+    return jsonify({"ok": True, **ingest(sites, wallets)})
+
+
+# --------------------------------------------------------------------------
+# TitanEye on-chain lookups (basic wallet info)
+# --------------------------------------------------------------------------
+
+ETHERSCAN_KEY_SHAPE = re.compile(r"^[A-Za-z0-9]{20,64}$")
+TRONSCAN_KEY_SHAPE = re.compile(r"^[0-9a-fA-F-]{32,40}$")
+BLOCKCHAIN_KEY_SHAPE = re.compile(r"^[A-Za-z0-9_\-]{8,128}$")
+CHAIN_CACHE: dict[tuple, tuple[float, dict]] = {}
+CHAIN_CACHE_LOCK = Lock()
+
+
+def chain_provider_for(chain: str):
+    for provider in CHAIN_PROVIDERS.values():
+        if chain in provider.chains:
+            return provider
+    return None
+
+
+def chain_cache_get(key: tuple):
+    if Config.CHAIN_CACHE_TTL <= 0:
+        return None
+    with CHAIN_CACHE_LOCK:
+        entry = CHAIN_CACHE.get(key)
+        if entry and time.time() - entry[0] <= Config.CHAIN_CACHE_TTL:
+            return entry
+        CHAIN_CACHE.pop(key, None)
+    return None
+
+
+def chain_cache_put(key: tuple, summary: dict) -> float:
+    stamp = time.time()
+    if Config.CHAIN_CACHE_TTL <= 0:
+        return stamp
+    with CHAIN_CACHE_LOCK:
+        CHAIN_CACHE[key] = (stamp, summary)
+        while len(CHAIN_CACHE) > Config.CHAIN_CACHE_MAX_ENTRIES:
+            CHAIN_CACHE.pop(next(iter(CHAIN_CACHE)))
+    return stamp
+
+
+@app.route("/api/chain/providers")
+def chain_providers_list():
+    """Which provider covers which chain. Never includes a key."""
+    return jsonify({
+        "ok": True,
+        "providers": {name: provider.capabilities() for name, provider in CHAIN_PROVIDERS.items()},
+    })
+
+
+@app.route("/api/chain/summary", methods=["POST"])
+def chain_summary():
+    """Basic on-chain facts for one wallet. The key is used for this call only."""
+    allowed, retry_after = chain_limiter.check(client_identity())
+    if not allowed:
+        return fail(
+            f"Too many wallet lookups from this address. Try again in {retry_after} seconds.",
+            429,
+            "local_rate_limited",
+            retry_after=retry_after,
+        )
+
+    body = request.get_json(silent=True)
+    if (
+        not isinstance(body, dict)
+        or not isinstance(body.get("address"), str)
+        or not isinstance(body.get("chain"), str)
+    ):
+        return fail("Send a JSON body with chain and address.", 400, "invalid_body")
+    chain = body["chain"].strip().lower()
+    if chain not in CHAINS:
+        return fail("That chain is not supported.", 400, "unsupported_chain")
+    check = validate_wallet(chain, body["address"][:200])
+    if not check.valid:
+        return fail(check.errors[0] if check.errors else "That wallet address is not valid.", 400, "invalid_wallet")
+    address = check.canonical
+
+    provider = chain_provider_for(chain)
+    if provider is None:
+        return fail(f"No on-chain provider covers {CHAINS[chain]} yet.", 400, "provider_unsupported_chain")
+
+    if provider.name == "etherscan":
+        key = (request.headers.get("X-Etherscan-Key") or "").strip()
+        if not key:
+            return fail("Enter your Etherscan API key to look up this wallet.", 401, "provider_key_missing")
+        if not ETHERSCAN_KEY_SHAPE.match(key):
+            return fail("That does not look like an Etherscan API key.", 400, "provider_key_invalid")
+    elif provider.name == "tronscan":
+        key = (request.headers.get("X-Tronscan-Key") or "").strip()
+        if not key:
+            return fail("Enter your Tronscan API key to look up this wallet.", 401, "provider_key_missing")
+        if not TRONSCAN_KEY_SHAPE.match(key):
+            return fail("That does not look like a Tronscan API key.", 400, "provider_key_invalid")
+    else:
+        key = (request.headers.get("X-Blockchain-Key") or "").strip() or None
+        if key and not BLOCKCHAIN_KEY_SHAPE.match(key):
+            return fail("That does not look like a Blockchain.com API key.", 400, "provider_key_invalid")
+
+    # The key is not part of the cache key: chain data is public and the key only authorises the call.
+    cache_key = (provider.name, chain, address.lower())
+    cached = chain_cache_get(cache_key)
+    if cached:
+        return jsonify({"ok": True, "summary": cached[1], "meta": {"cached": True, "cached_at": cached[0]}})
+
+    try:
+        summary = provider.summary(chain, address, key)
+    except ProviderError as exc:
+        log.info("chain lookup failed: %s (%s)", exc.code, exc.status)
+        extra = {"retry_after": exc.retry_after} if exc.retry_after else {}
+        return fail(exc.message, exc.status, exc.code, **extra)
+
+    summary["queried_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    stamp = chain_cache_put(cache_key, summary)
+    return jsonify({"ok": True, "summary": summary, "meta": {"cached": False, "cached_at": stamp}})
 
 
 # --------------------------------------------------------------------------
