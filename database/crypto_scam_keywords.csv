@@ -118,10 +118,10 @@ professional-level security,risk_denial,4
 multi-tier encryption,risk_denial,3
 offline cold storage,risk_denial,3
 continuous live surveillance,risk_denial,3
-investment plan,hyip_plan_structure,3
+investment plan,hyip_plan_structure,5
 choose a plan,hyip_plan_structure,3
 investment package,hyip_plan_structure,3
-investment tier,hyip_plan_structure,3
+investment tier,hyip_plan_structure,5
 starter plan,hyip_plan_structure,4
 starter package,hyip_plan_structure,3
 basic plan,hyip_plan_structure,4

@@ -200,6 +200,32 @@ code {
 
 .field::placeholder { color: var(--ink-faint); }
 
+/* Selects: drop the native arrow for a chevron that matches the palette. The
+   open list is drawn by the browser, so only its colours can be set. */
+select.field {
+  -webkit-appearance: none;
+  appearance: none;
+  padding-right: 34px;
+  font-weight: 600;
+  cursor: pointer;
+  background-color: var(--paper);
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%231769c2' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"),
+    linear-gradient(180deg, #ffffff 0%, var(--paper) 100%);
+  background-repeat: no-repeat, no-repeat;
+  background-position: right 12px center, 0 0;
+  background-size: 12px 8px, 100% 100%;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+select.field:hover { border-color: var(--annot); }
+
+select.field option {
+  background: var(--paper);
+  color: var(--ink);
+  font-weight: 500;
+}
+
 .field--query {
   font-family: var(--mono);
   font-size: 15px;
